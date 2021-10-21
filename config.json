@@ -1,0 +1,11 @@
+{
+    "debug": false,
+    "name": "Your Full Name",
+    "email": "your.username@domain.com",
+    "takeSurvey": true,
+    "allLocations": true,
+    "locations": [
+        "Bürgeramt Rathaus Neukölln",
+        "Bürgeramt Rathaus Neukölln - Vorzugstermine"
+    ]
+}

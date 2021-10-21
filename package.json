@@ -1,14 +1,20 @@
 {
-  "name": "anmeldung_termin",
-  "version": "1.0.0",
+  "name": "anmeldung-berlin",
+  "version": "0.0.1",
   "description": "This script will find and book an Anmeldung appointment automatically for you in Berlin",
   "main": "index.js",
   "scripts": {
+    "start": "node index.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
-  "author": "solidneo",
+  "author": "Daniel Cortez Stevenson",
   "license": "MIT",
   "dependencies": {
-    "puppeteer": "^9.0.0"
+    "bluebird": "^3.7.2",
+    "puppeteer": "^10.4.0"
+  },
+  "devDependencies": {
+    "eslint": "^7.32.0",
+    "eslint-config-prettier": "^8.3.0"
   }
 }

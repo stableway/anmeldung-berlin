@@ -1,125 +1,193 @@
 const fs = require('fs');
 const puppeteer = require('puppeteer');
-const config = {
-    'debug': true,
-    'minTimestamp': 1609801200,// Use Berlin time-zone here
-    'maxTimestamp': 1612479600,// Use Berlin time-zone here
-    'name': 'ADD YOUR FULL NAME HERE',
-    'email': 'ADD YOUR EMAIL HERE',
-    'moreDetails': '',// ADD FURTHER DETAILS HERE (OPTIONAL)
-    'takeScreenshot': true,
-    'screenshotFile1': 'screenshot1.png',
-    'screenshotFile2': 'screenshot2.png',
-    'logFile': 'logFile.txt'
-};
-
-const staticConfig = {
-    'entryUrl': 'https://service.berlin.de/terminvereinbarung/termin/tag.php?termin=1&anliegen[]=120686&dienstleisterlist=122210,122217,327316,122219,327312,122227,327314,122231,327346,122243,327348,122252,329742,122260,329745,122262,329748,122254,329751,122271,327278,122273,327274,122277,327276,122280,327294,122282,327290,122284,327292,327539,122291,327270,122285,327266,122286,327264,122296,327268,150230,329760,122301,327282,122297,327286,122294,327284,122312,329763,122304,327330,122311,327334,122309,327332,122281,327352,122279,329772,122276,327324,122274,327326,122267,329766,122246,327318,122251,327320,122257,327322,122208,327298,122226,327300',
-};
+const bluebird = require('bluebird');
+const {locations, entryUrl} = require('./constants.json');
+const config = require('./config.json');
 
 (async() => {
-    if(shouldBook()){
-        console.log('----');
-        console.log('Starting: ' + new Date(Date.now()).toTimeString());
-        bookTermin();
+    console.log('---- Get an Anmeldung Termin ------');
+    console.log('Starting: ' + new Date(Date.now()).toUTCString());
+    console.log('Config file:', JSON.stringify(config, null, 2))
+    while (true) {
+        let hasBooked = await bookTermin();
+        if (hasBooked) {
+            console.log('Booking successful!');
+            break;
+        }
+        console.log('Booking did not succeed.')
+        console.log('Waiting 2 minutes until next attempt ...');
+        await sleep(2 * 60 * 1000);
     }
+    console.log('Ending: ' + new Date(Date.now()).toUTCString());
 })();
 
-function shouldBook() {
-    if(!fs.existsSync(config.logFile)){
-        return true;
-    } else {
-        return false;
-    }
-}
-
-async function saveTerminBooked() {
-    await fs.writeFileSync(config.logFile, JSON.stringify({ 'booked': Date.now() }), 'utf8');
-}
-
 async function bookTermin() {
-    const browser = await puppeteer.launch({
-  		headless: !config.debug,
-        defaultViewport: null,
-        // Uncomment the lines below if you are using a Raspberry to run the script
-        //product: 'chrome',
-        //executablePath: '/usr/bin/chromium-browser',
-        args: ['--no-sandbox', '--disable-setuid-sandbox']
-  	});
-    const page = await browser.newPage();
-    await page.setRequestInterception(true);
-    page.on('request', (req) => {
-        if(req.resourceType() === 'image' || req.resourceType() === 'stylesheet' || req.resourceType() === 'font'){
-            req.abort();
+    const startTime = new Date(Date.now()).toUTCString();
+    let browser, page;
+    try {
+        console.log('Launching the browser ...');
+        browser = await puppeteer.launch({
+            executablePath: process.env.PUPPETEER_EXECUTABLE_PATH ? process.env.PUPPETEER_EXECUTABLE_PATH : undefined,
+            headless: !config.debug,
+            defaultViewport: undefined,
+            slowMo: config.debug ? 1500 : undefined,
+            args: ['--no-sandbox', '--disable-setuid-sandbox']
+        });
+        page = await browser.newPage();
+        await applyStealth(page);
+    } catch (e) {
+        console.log(e);
+    }
+
+    try {
+        // Create calendar URL
+        let calendarUrl = entryUrl
+        if (config.allLocations === true) {
+            for (let location in locations) {
+                calendarUrl = calendarUrl + locations[location] + ',';
+            }
         } else {
-            req.continue();
-        }
-    });
-
-    let success = false;
-
-    try{
-        await page.goto(staticConfig.entryUrl);
-
-        await page.waitForSelector('div.span7.column-content', { timeout: 120000 });
-
-        // Check if there are Termins available
-        let available = (await page.$$('td.buchbar')).length;
-        console.log('Available Termins: ' + available);
-
-        // If there are bookable Termins
-        if(available > 0){
-            let dates = await page.$$('td.buchbar');
-            for(let i=0;i<available;i++){
-                let link = await dates[i].$eval('a', el => el.getAttribute('href'));
-                console.log('Link ' + i + ': ' + link);
-                // Checking if Termins are within desirable range
-                let regex = /\d+/g;
-                let matches = link.match(regex);
-                if(matches.length > 0 && Number(matches[0]) > config.minTimestamp && Number(matches[0]) < config.maxTimestamp){
-                    console.log('Trying to book ' + matches[0]);
-                    await page.click('a[href*="' + link + '"]');
-                    console.log('Booking step 1');
-
-                    await page.waitForSelector('tr > td.frei', { timeout: 120000 });
-                    const termins = await page.$$('tr > td.frei');
-                    await termins[0].click();
-                    console.log('Booking step 2');
-
-                    // Fill out custom information
-                    await page.waitForSelector('input[id="familyName"]', { timeout: 120000 });
-                    await page.type('input[id="familyName"]', config.name);
-                    await page.type('input[id="email"]', config.email);
-                    await page.type('textarea[name="amendment"]', config.moreDetails);
-                    console.log('Booking step 3');
-
-                    // Fill out standard information
-                    await page.select('select[name="surveyAccepted"]', '1')
-                    await page.click('input[id="agbgelesen"]');
-                    console.log('Booking step 4');
-
-                    // Screenshot
-                    if(config.takeScreenshot)
-                        await page.screenshot({ path: config.screenshotFile1, fullPage: true });
-
-                    // Book
-                    await page.click('button[id="register_submit"]');
-                    console.log('Booking step 5');
-                    await page.waitForSelector('img.logo', { timeout: 120000 });
-                    saveTerminBooked();
-
-                    // Screenshot
-                    if(config.takeScreenshot)
-                        await page.screenshot({ path: config.screenshotFile2, fullPage: true });
-
-                    break;
-                }
+            for (let location in config.locations) {
+                calendarUrl = calendarUrl + locations[location] + ',';
             }
         }
-        success = true;
-    } catch (err) {
-        console.log(err);
+        calendarUrl = calendarUrl.slice(0, calendarUrl.length - 1);
+        console.log('Going to calendar of appointment dates');
+
+        await page.goto(calendarUrl, {waitUntil: 'domcontentloaded'});
+        await page.waitForSelector('div.span7.column-content');
+        const dateLinks = await getAllDateLinks(page);
+        console.log('Got date links:', JSON.stringify(dateLinks, null, 2));
+        if (dateLinks.length === 0) return false;
+        page.close();
+
+        const timeslotLinks = [].concat.apply([], await bluebird.any(dateLinks.map(async url => {
+            return await withPage(browser)(async (page) => {
+                try {
+                    console.log('Navigating to appointment booking for date ...');
+                    await page.goto(url, {waitUntil: 'domcontentloaded'});
+                } catch(e) {
+                    console.log('Navigation failed.');
+                }
+                try {
+                    console.log('Waiting for available timeslots ...');
+                    await page.waitForSelector('tr > td.frei');
+                } catch(e) {
+                    console.log('No more available timeslots for date :(');
+                }
+                try {
+                    return await getTimeslotLinks(page);
+                } catch {
+                    return [];
+                }
+            });
+        })), {concurrency: 3});
+        console.log('Got timeslot links:', JSON.stringify(timeslotLinks, null, 2));
+        if (timeslotLinks.length === 0) return false;
+
+        while (true) {
+            let [bookingPage, bookingUrl, foundTimeslot] = await bluebird.any(timeslotLinks.map(async url => {
+                return await withPage(browser)(async (page) => {
+                    console.log('Navigating to timeslot:',  url);
+                    try {
+                        await page.goto(url, {waitUntil: 'domcontentloaded'});
+                    } catch(e) {
+                        console.log('Navigation failed.');
+                    }
+                    console.log('Waiting for form to render ...');
+                    await Promise.all([
+                        page.waitForSelector('input#familyName'),
+                        page.waitForSelector('input#email'),
+                        page.waitForSelector('select[name="surveyAccepted"]'),
+                        page.waitForSelector('input#agbgelesen'),
+                        page.waitForSelector('button#register_submit.btn'),
+                    ]);
+                    return [page, url, true]
+                });
+            }), {concurrency: 3}).catch(() => {
+                console.log('No more timeslot links are rendering forms.');
+                return [undefined, undefined, false];
+            })
+            if (foundTimeslot === false) return false;
+    
+            try {
+                console.log('Filling out form with config data ...');
+                await Promise.all([
+                    bookingPage.$eval('input#familyName', (el, config) => el.value = config.name, config),
+                    bookingPage.$eval('input#email', (el, config) => el.value = config.email, config),
+                    bookingPage.select('select[name="surveyAccepted"]', config.takeSurvey ? '1' : '0'),
+                    bookingPage.$eval('input#agbgelesen', el => el.checked = true),
+                ]);
+    
+                console.log('Submitting form ...');
+                await Promise.all([
+                    bookingPage.waitForNavigation(),
+                    bookingPage.click('button#register_submit.btn'),
+                ]);
+    
+                try {
+                    console.log('Waiting 10 seconds for booking result to render ...');
+                    await bookingPage.waitForTimeout(10000);
+    
+                    console.log('Saving booking info to files ...');
+                    await Promise.allSettled([
+                        fs.writeFile(`./output/booking-${startTime}.json`, JSON.stringify({ bookedAt: startTime }, null, 2), (err) => {
+                            if (err) throw err;
+                            console.log('The booking has been saved!');
+                        }),
+                        bookingPage.screenshot({ path: `./output/booking-${startTime}.png`, fullbookingPage: true }),
+                    ]);
+                } catch (e) {
+                    console.log(e);
+                    console.log('Error thrown during booking confirmation. Exiting. Check your config.email address for booking info.')
+                }
+    
+                console.log('Success!!!');
+                return true;
+            } catch (e) {
+                console.log(`Booking timeslot link ${bookingUrl} failed, trying the next one now.`);
+                console.log(e.message);
+            }
+        }
+    } catch (e) {
+        console.log(e);
+        return false;
+    } finally {
+        await browser.close();
     }
-    browser.close();
-    return success;
+}
+
+const withPage = (browser) => async (fn) => {
+	const page = await browser.newPage();
+    await applyStealth(page);
+	try {
+		return await fn(page);
+	} catch {
+		await page.close();
+	}
+}
+
+const applyStealth = (page) =>
+    page.addScriptTag({url: 'https://raw.githack.com/berstend/puppeteer-extra/stealth-js/stealth.min.js'})
+
+async function getAllDateLinks(page) {
+    console.log('Getting time booking URLs for each available appointment date');
+    let links = await getDateLinks(page);
+    await Promise.all([
+        page.waitForNavigation(),
+        page.click('th.next'),
+    ]);
+    return await links.concat(await getDateLinks(page));
+}
+
+async function getDateLinks(page) {
+    return await page.$$eval('td.buchbar > a', els => els.map(el => el.href));
+}
+
+async function getTimeslotLinks(page) {
+    return await page.$$eval('td.frei > a', els => els.map(el => el.href));
+}
+
+function sleep(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
 }
