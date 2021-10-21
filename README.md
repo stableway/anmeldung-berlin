@@ -16,6 +16,7 @@ Variable | Default | Required
  `name` | `"Your Full Name"` | `true`
  `email` | `"your.username@domain.com"` | `true`
  `takeSurvey` | `true` | `false`
+ `note` | `""` | `false`
  `allLocations` | `true` | `false`*
  `locations` | `["Bürgeramt Rathaus Neukölln", "Bürgeramt Rathaus Neukölln - Vorzugsterminen]` | `false`*
 

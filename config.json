@@ -3,6 +3,7 @@
     "name": "Your Full Name",
     "email": "your.username@domain.com",
     "takeSurvey": true,
+    "note": "",
     "allLocations": true,
     "locations": [
         "Bürgeramt Rathaus Neukölln",

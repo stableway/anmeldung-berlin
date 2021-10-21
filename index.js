@@ -118,7 +118,18 @@ async function bookTermin() {
                     bookingPage.select('select[name="surveyAccepted"]', config.takeSurvey ? '1' : '0'),
                     bookingPage.$eval('input#agbgelesen', el => el.checked = true),
                 ]);
-    
+
+                if (config.note !== undefined && config.note !== "") {
+                    console.log('Writing the configured note if the feature is available ...')
+                    await bookingPage.waitForSelector('textarea[name=amendment]', {timeout: 10000})
+                        .then(el => el.type(config.note))
+                        .catch(e => {
+                            if (e instanceof puppeteer.errors.TimeoutError) {
+                                console.log("No note entry available. Continuing with booking anyway.");
+                            }
+                        })
+                }
+
                 console.log('Submitting form ...');
                 await Promise.all([
                     bookingPage.waitForNavigation(),
