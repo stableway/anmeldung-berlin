@@ -20,7 +20,7 @@ Variable | Default | Required
  `locations` | `["Bürgeramt Rathaus Neukölln", "Bürgeramt Rathaus Neukölln - Vorzugsterminen]` | `false`*
 
 *Either `allLocations` or `locations` must be defined.
-
+*A list of allowed `locations` is available in [./constants.json](./constants.json)
 ### With Docker (recommended)
 
 ```bash
@@ -33,8 +33,6 @@ docker run \
 ```
 
 ### Local on Mac OS
-
-You must have the Google Chrome App installed. `$PUPPETEER_EXECUTABLE_PATH` is the Google Chrome executable path on your computer.
 
 ```bash
 # Install
