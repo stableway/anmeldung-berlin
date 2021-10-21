@@ -48,3 +48,9 @@ NODE_OPTIONS="--max_old_space_size=30000 --max-http-header-size=80000" \
 ## Output
 
 The `./output` directory will save a picture of the appointment confirmation page and a JSON file with appointment info. Check your `email` inbox (and spam folder) for the appointment confirmation.
+
+## Known Issues
+
+- Some locations require a phone number, which is not handled. Your booking .png confirmation in this case will show an error. Simply restart the program and hope you don't hit it again.
+- No verification is made of successful booking. If you click submit, you'll get a 'Success!!!' but double check the booking in the case of bad form inputs.
+- There is a Captcha service that can be triggered, which is not handled.
