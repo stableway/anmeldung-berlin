@@ -20,7 +20,9 @@ Variable | Default | Required
  `locations` | `["Bürgeramt Rathaus Neukölln", "Bürgeramt Rathaus Neukölln - Vorzugsterminen]` | `false`*
 
 *Either `allLocations` or `locations` must be defined.
+
 *A list of allowed `locations` is available in [./constants.json](./constants.json)
+
 ### With Docker (recommended)
 
 ```bash
