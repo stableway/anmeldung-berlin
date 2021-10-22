@@ -8,5 +8,7 @@
     "locations": [
         "Bürgeramt Rathaus Neukölln",
         "Bürgeramt Rathaus Neukölln - Vorzugstermine"
-    ]
+    ],
+    "concurrency": 3,
+    "waitSeconds": 120
 }

@@ -19,6 +19,8 @@ Variable | Default | Required
  `note` | `""` | `false`
  `allLocations` | `true` | `false`*
  `locations` | `["Bürgeramt Rathaus Neukölln", "Bürgeramt Rathaus Neukölln - Vorzugsterminen]` | `false`*
+ `concurrency` | `3` | `false`
+ `waitSeconds` | `120` | `false`
 
 *Either `allLocations` or `locations` must be defined.
 
