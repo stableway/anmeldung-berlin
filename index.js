@@ -137,7 +137,14 @@ async function bookTermin() {
             config.takeSurvey ? "1" : "0"
           ),
           bookingPage.$eval("input#agbgelesen", (el) => (el.checked = true)),
-        ]);
+        ]).catch((e) => {
+          console.log(
+            "Writing essential information failed with:",
+            e.message,
+            "\nCancelling form submission"
+          );
+          throw e;
+        });
 
         // The note feature is not available for every location.
         if (config.note !== undefined && config.note !== "") {
@@ -146,7 +153,7 @@ async function bookTermin() {
           );
           await bookingPage
             .waitForSelector("textarea[name=amendment]", { timeout: 5000 })
-            .then((el) => el.type(config.note))
+            .then((handle) => handle.type(config.note))
             .catch((e) =>
               console.log(
                 "Write note failed with:",
@@ -156,7 +163,31 @@ async function bookTermin() {
             );
         }
 
-        // TODO: Handle when phone number is required for some locations.
+        // Telephone entry is not available for every location.
+        console.log("Looking for the telephone input ...");
+        const telephoneHandle = await bookingPage
+          .waitForSelector("input#telephone", { timeout: 5000 })
+          .catch((e) =>
+            console.log(
+              "Did not find telephone input with:",
+              e.message,
+              "\nContinuing with booking without providing a contact number ..."
+            )
+          );
+
+        if (telephoneHandle !== undefined) {
+          console.log("Writing configured phone into form ...");
+          await telephoneHandle
+            .evaluate((el, config) => (el.value = config.phone), config)
+            .catch((e) => {
+              console.log(
+                "Writing phone number failed with:",
+                e.message,
+                "\nCancelling form submission"
+              );
+              throw e;
+            });
+        }
 
         console.log("Submitting form ...");
         await Promise.all([

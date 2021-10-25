@@ -1,7 +1,8 @@
 {
     "debug": false,
-    "name": "Your Full Name",
-    "email": "your.username@domain.com",
+    "name": "Max Mustermann",
+    "email": "max.mustermann@domain.com",
+    "phone": "0176 55555555",
     "takeSurvey": true,
     "note": "",
     "allLocations": true,
