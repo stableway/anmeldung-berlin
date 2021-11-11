@@ -278,8 +278,8 @@ function getCalendarLink(entryUrl, allLocations, locations, locationToIdMap) {
       link = link + locationToIdMap[location] + ",";
     }
   } else {
-    for (const location in locations) {
-      link = link + locationToIdMap[location] + ",";
+    for (let i = 0; i < locations.length; i++) {
+      link = link + locationToIdMap[locations[i]] + ",";
     }
   }
   return link.slice(0, link.length - 1);
