@@ -20,6 +20,10 @@ Variable | Default | Required
  `note` | `""` | `false`
  `allLocations` | `true` | `false`*
  `locations` | `["Bürgeramt Rathaus Neukölln", "Bürgeramt Rathaus Neukölln - Vorzugsterminen"]` | `false`**
+ `earliestDate` | `"1970-01-01 GMT"` | `true`
+ `latestDate` | `"2069-01-01 GMT"` | `true`
+ `earliestTime` | `"08:00 GMT"` | `true`
+ `latestTime` | `"18:00 GMT"` | `true`
  `concurrency` | `3` | `false`
  `waitSeconds` | `120` | `false`
 

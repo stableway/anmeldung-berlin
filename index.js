@@ -47,13 +47,18 @@ async function bookTermin() {
     console.log("Going to calendar of appointment dates");
     await page.goto(calendarUrl, { waitUntil: "domcontentloaded" });
     await page.waitForSelector("div.span7.column-content");
-    const dateLinks = await getAllDateLinks(page);
+    let dateLinks = await getAllDateLinks(page);
+    dateLinks = filterLinksBetweenDates(
+      dateLinks,
+      config.earliestDate,
+      config.latestDate
+    );
     if (dateLinks.length === 0) return false;
     // using withPage function from now on.
     page.close();
 
     // Get all timeslot booking page links for each available date in parallel.
-    const timeslotLinks = [].concat.apply(
+    let timeslotLinks = [].concat.apply(
       [],
       await bluebird.all(
         bluebird.map(dateLinks, async (url) => {
@@ -73,6 +78,11 @@ async function bookTermin() {
       )
     );
     // If no links are available for any dates, go into waiting mode.
+    timeslotLinks = filterLinksBetweenTimes(
+      timeslotLinks,
+      config.earliestTime,
+      config.latestTime
+    );
     if (timeslotLinks.length === 0) return false;
 
     while (true) {
@@ -288,26 +298,36 @@ function getCalendarLink(entryUrl, allLocations, locations, locationToIdMap) {
 async function getAllDateLinks(page) {
   console.log("Getting available date links from calendar");
   const linksPage1 = await getDateLinks(page);
+  console.log("Got date links:", JSON.stringify(linksPage1, null, 2));
   await paginateCalendar(page);
   const linksPage2 = await getDateLinks(page);
+  console.log("Got date links:", JSON.stringify(linksPage2, null, 2));
   const links = linksPage1.concat(linksPage2);
-  console.log("All date links:", JSON.stringify(links, null, 2));
+  console.log("Unique date links:", JSON.stringify([...new Set(links)], null, 2));
   return [...new Set(links)];
 }
 
 async function getDateLinks(page) {
   // Selector might not be there so don't bother waiting for it.
-  const links = await page.$$eval("td.buchbar > a", (els) =>
+  return await page.$$eval("td.buchbar > a", (els) =>
     els
       .map((el) => el.href)
       .filter((href) => href !== undefined && href !== null)
   );
-  console.log("Got date links:", JSON.stringify(links, null, 2));
-  return links;
 }
 
 async function paginateCalendar(page) {
   await Promise.all([page.waitForNavigation(), page.click("th.next")]);
+}
+
+function filterLinksBetweenDates(links, earliestDate, latestDate) {
+  return links.filter((link) => {
+    const linkDate = new Date(parseInt(link.match(/\d+/)[0]) * 1000);
+    if (new Date(earliestDate) <= linkDate <= new Date(latestDate)) {
+      return true;
+    }
+    return false;
+  });
 }
 
 async function getTimeslotLinks(page) {
@@ -324,6 +344,21 @@ async function getTimeslotLinks(page) {
     .catch(() => []);
   console.log("Got timeslot links:", JSON.stringify(links, null, 2));
   return links;
+}
+
+function filterLinksBetweenTimes(links, earliestTime, latestTime) {
+  return links.filter((link) => {
+    const linkDate = new Date(parseInt(link.match(/\d+/)[0]) * 1000);
+    const linkTime = `${linkDate.getHours()}:${linkDate.getMinutes()} GMT`;
+    if (
+      new Date("1970 " + earliestTime) <=
+      new Date("1970 " + linkTime) <=
+      new Date("1970 " + latestTime)
+    ) {
+      return true;
+    }
+    return false;
+  });
 }
 
 function sleep(ms) {
