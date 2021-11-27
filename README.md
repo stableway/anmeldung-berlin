@@ -18,6 +18,7 @@ Variable | Default | Required
  `phone` | `"0176 55555555"` | `true`
  `takeSurvey` | `true` | `false`
  `note` | `""` | `false`
+ `service` | `"Anmeldung einer Wohnung"` | `true`**
  `allLocations` | `true` | `false`*
  `locations` | `["Bürgeramt Rathaus Neukölln", "Bürgeramt Rathaus Neukölln - Vorzugsterminen"]` | `false`**
  `earliestDate` | `"1970-01-01 GMT"` | `true`
@@ -29,7 +30,7 @@ Variable | Default | Required
 
 *Either `allLocations` or `locations` must be defined.
 
-**A list of allowed `locations` is available in [./constants.json](./constants.json)
+**A list of allowed `locations` and `services` is available in [./constants.json](./constants.json)
 
 ### With Docker (recommended)
 
@@ -60,6 +61,10 @@ The [./output](./output) directory will save a picture of the appointment confir
 
 - No verification is made of successful booking. If you click submit, you'll get a 'Success!!!' but double check the booking in the case of bad form inputs.
 - There is a Captcha service that can be triggered, which is not handled.
+
+## Other Services' Appointments
+
+Two services are available (Anmeldung and Change of Passport for EU Blue Card), and this project can be easily extended to include other services' appointments by adding service names and numbers to [./constants.json](./constants.json).
 
 ## Contributing
 

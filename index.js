@@ -1,7 +1,7 @@
 const fs = require("fs");
 const puppeteer = require("puppeteer");
 const bluebird = require("bluebird");
-const { locations, entryUrl } = require("./constants.json");
+const constants = require("./constants.json");
 const config = require("./config.json");
 
 (async () => {
@@ -38,13 +38,12 @@ async function bookTermin() {
     const page = await browser.newPage();
     await applyStealth(page);
     const calendarUrl = getCalendarLink(
-      entryUrl,
+      config.service,
       config.allLocations,
-      config.locations,
-      locations
+      config.locations
     );
 
-    console.log("Going to calendar of appointment dates");
+    console.log("Going to calendar at:", calendarUrl);
     await page.goto(calendarUrl, { waitUntil: "domcontentloaded" });
     await page.waitForSelector("div.span7.column-content");
     let dateLinks = await getAllDateLinks(page);
@@ -281,18 +280,23 @@ const applyStealth = (page) =>
       )
     );
 
-function getCalendarLink(entryUrl, allLocations, locations, locationToIdMap) {
-  let link = entryUrl;
+function getCalendarLink(service, allLocations, locations) {
+  let link = constants.entryUrl;
+  link += constants.services[service] + "%2F";
+  link += "&anliegen[]=";
+  link += constants.services[service];
+  link += "&dienstleisterlist=";
   if (allLocations === true) {
-    for (const location in locationToIdMap) {
-      link = link + locationToIdMap[location] + ",";
+    for (const location in constants.locations) {
+      link += constants.locations[location] + ",";
     }
   } else {
     for (let i = 0; i < locations.length; i++) {
-      link = link + locationToIdMap[locations[i]] + ",";
+      link += constants.locations[locations[i]] + ",";
     }
   }
-  return link.slice(0, link.length - 1);
+  link = link.slice(0, link.length - 1);
+  return link;
 }
 
 async function getAllDateLinks(page) {
@@ -303,7 +307,10 @@ async function getAllDateLinks(page) {
   const linksPage2 = await getDateLinks(page);
   console.log("Got date links:", JSON.stringify(linksPage2, null, 2));
   const links = linksPage1.concat(linksPage2);
-  console.log("Unique date links:", JSON.stringify([...new Set(links)], null, 2));
+  console.log(
+    "Unique date links:",
+    JSON.stringify([...new Set(links)], null, 2)
+  );
   return [...new Set(links)];
 }
 

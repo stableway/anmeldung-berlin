@@ -5,6 +5,7 @@
     "phone": "0176 55555555",
     "takeSurvey": true,
     "note": "",
+    "service": "Anmeldung einer Wohnung",
     "allLocations": true,
     "locations": [
         "Bürgeramt Rathaus Neukölln",

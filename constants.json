@@ -1,5 +1,9 @@
 {
-    "entryUrl": "https://service.berlin.de/terminvereinbarung/termin/tag.php?termin=1&anliegen[]=120686&herkunft=http%3A%2F%2Fservice.berlin.de%2Fdienstleistung%2F120686%2F&dienstleisterlist=",
+    "entryUrl": "https://service.berlin.de/terminvereinbarung/termin/tag.php?termin=1&herkunft=http%3A%2F%2Fservice.berlin.de%2Fdienstleistung%2F",
+    "services": {
+        "Anmeldung einer Wohnung": 120686,
+        "Blaue Karte EU auf einen neuen Pass übertragen": 326798
+    },
     "locations": {
         "Bürgeramt Halemweg (Außenstelle)": 122210,
         "Bürgeramt Heerstraße": 122217,
