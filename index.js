@@ -1,135 +1,121 @@
 const fs = require("fs");
 const puppeteer = require("puppeteer");
-const bluebird = require("bluebird");
+const Promise = require("bluebird");
 const constants = require("./constants.json");
 const config = require("./config.json");
 
 (async () => {
   console.log("---- Get an Anmeldung Termin ------");
-  console.log("Starting: " + new Date(Date.now()).toUTCString());
+  console.log("Starting: " + timestamp());
   console.log("Config file:", JSON.stringify(config, null, 2));
 
-  while (true) {
-    let hasBooked = await bookTermin();
+  let hasBooked = false;
+  while (!hasBooked) {
+    hasBooked = await bookTermin();
     if (hasBooked) {
       console.log("Booking successful!");
-      break;
+    } else {
+      console.log("Booking did not succeed.");
+      console.log(
+        "Waiting",
+        config.waitSeconds,
+        "seconds until next attempt ..."
+      );
+      await sleep(config.waitSeconds * 1000 * 1000);
     }
-    console.log("Booking did not succeed.");
-    const waitSeconds = config.waitSeconds ? config.waitSeconds : 120;
-    console.log("Waiting", waitSeconds, "seconds until next attempt ...");
-    await sleep(waitSeconds * 1000);
   }
-  console.log("Ending: " + new Date(Date.now()).toUTCString());
+  console.log("Ending: " + timestamp());
 })();
 
+function timestamp() {
+  return new Date(Date.now()).toUTCString();
+}
+
 async function bookTermin() {
-  const startTime = new Date(Date.now()).toUTCString();
+  const startTime = timestamp();
   let browser;
 
   try {
     console.log("Launching the browser ...");
     browser = await puppeteer.launch({
       headless: !config.debug,
-      defaultViewport: undefined,
       slowMo: config.debug ? 1500 : undefined,
       args: ["--no-sandbox", "--disable-setuid-sandbox"],
     });
-    const page = await browser.newPage();
-    await applyStealth(page);
-    const calendarUrl = getCalendarLink(
-      config.service,
-      config.allLocations,
-      config.locations
-    );
 
-    console.log("Going to calendar at:", calendarUrl);
-    await page.goto(calendarUrl, { waitUntil: "domcontentloaded" });
-    await page.waitForSelector("div.span7.column-content");
-    let dateLinks = await getAllDateLinks(page);
-    dateLinks = filterLinksBetweenDates(
-      dateLinks,
-      config.earliestDate,
-      config.latestDate
-    );
-    if (dateLinks.length === 0) return false;
-    // using withPage function from now on.
-    page.close();
+    const dateURLs = await withPage(browser)(async (page) => {
+      const CALENDAR_SELECTOR = "div.span7.column-content";
+      const calendarURL = getCalendarURL(config);
+      console.log("Going to calendar at:", calendarURL);
+      await page.goto(calendarURL, { waitUntil: "domcontentloaded" });
+      await page.waitForSelector(CALENDAR_SELECTOR);
+      let dateURLs = await getAllDateURLs(page);
+      return filterURLsBetweenDates(dateURLs, config);
+    });
+    if (dateURLs.length === 0) return false;
 
-    // Get all timeslot booking page links for each available date in parallel.
-    let timeslotLinks = [].concat.apply(
+    // Get all timeslot booking page URLs for each available date in parallel.
+    let timeslotURLs = [].concat.apply(
       [],
-      await bluebird.all(
-        bluebird.map(dateLinks, async (url) => {
-          // Create promise for each link
+      await Promise.all(
+        Promise.map(dateURLs, async (url) => {
+          // Create promise for each URL
           return withPage(browser)(async (page) => {
             console.log("Getting timeslots for:", url);
             await page.goto(url, { waitUntil: "domcontentloaded" });
-            const links = await getTimeslotLinks(page);
-            return links;
+            return await getTimeslotURLs(page);
           }).catch((e) => {
-            // If one link fails, just return [] and go ahead with the links you could find.
+            // If one URL fails, just return [] and go ahead with the URLs you could find.
             console.log("Get timeslots failed for:", url, "with:", e.message);
             return [];
           });
         }),
-        { concurrency: config.concurrency ? config.concurrency : 3 }
+        { concurrency: config.concurrency || 3 }
       )
     );
-    // If no links are available for any dates, go into waiting mode.
-    timeslotLinks = filterLinksBetweenTimes(
-      timeslotLinks,
-      config.earliestTime,
-      config.latestTime
-    );
-    if (timeslotLinks.length === 0) return false;
+    // If no URLs are available for any dates, go into waiting mode.
+    timeslotURLs = filterURLsBetweenTimes(timeslotURLs, config);
+    if (timeslotURLs.length === 0) return false;
 
     while (true) {
       // Get the first booking page that renders the input form
-      const bookingPage = await bluebird
-        .any(
-          bluebird.map(
-            timeslotLinks,
-            async (url) => {
-              // Create promise for each link
-              return withPage(browser, { alwaysClosePage: false })(
-                async (page) => {
-                  console.log("Getting booking page for:", url);
-                  await page.goto(url, { waitUntil: "domcontentloaded" });
+      const bookingPage = await Promise.any(
+        Promise.map(
+          timeslotURLs,
+          async (url) => {
+            // Create promise for each URL
+            return withPage(browser, { alwaysClosePage: false })(
+              async (page) => {
+                console.log("Getting booking page for:", url);
+                await page.goto(url, { waitUntil: "domcontentloaded" });
 
-                  console.log("Waiting for booking form to render for:", url);
-                  await Promise.all([
-                    page.waitForSelector("input#familyName"),
-                    page.waitForSelector("input#email"),
-                    page.waitForSelector('select[name="surveyAccepted"]'),
-                    page.waitForSelector("input#agbgelesen"),
-                    page.waitForSelector("button#register_submit.btn"),
-                  ]);
-                  return page;
-                }
-              ).catch((e) => {
-                console.log(
-                  "Get booking page failed for:",
-                  url,
-                  "with:",
-                  e.message
-                );
-                throw e;
-              });
-            },
-            { concurrency: config.concurrency ? config.concurrency : 3 }
-          )
+                console.log("Waiting for booking form to render for:", url);
+                await Promise.all([
+                  page.waitForSelector("input#familyName"),
+                  page.waitForSelector("input#email"),
+                  page.waitForSelector('select[name="surveyAccepted"]'),
+                  page.waitForSelector("input#agbgelesen"),
+                  page.waitForSelector("button#register_submit.btn"),
+                ]);
+                return page;
+              }
+            ).catch((e) => {
+              console.error(e.message, `Get booking page failed for: ${url}`);
+              throw e;
+            });
+          },
+          { concurrency: config.concurrency || 3 }
         )
-        .catch((e) => {
-          console.log("Get booking pages failed with:", e.message);
-          return undefined;
-        });
+      ).catch((e) => {
+        console.error(e.message, "Get booking pages failed!");
+        return;
+      });
       // If no booking pages render, then go into waiting mode.
       if (bookingPage === undefined) return false;
 
-      const bookingPageUrl = bookingPage.url();
+      const bookingPageURL = bookingPage.url();
       try {
-        console.log("Filling out form with config data at:", bookingPageUrl);
+        console.log("Filling out form with config data at:", bookingPageURL);
         await Promise.all([
           bookingPage.$eval(
             "input#familyName",
@@ -147,27 +133,25 @@ async function bookTermin() {
           ),
           bookingPage.$eval("input#agbgelesen", (el) => (el.checked = true)),
         ]).catch((e) => {
-          console.log(
-            "Writing essential information failed with:",
+          console.error(
             e.message,
-            "\nCancelling form submission"
+            "Writing essential information failed. Cancelling form submission."
           );
           throw e;
         });
 
         // The note feature is not available for every location.
-        if (config.note !== undefined && config.note !== "") {
+        if (!config.note) {
           console.log(
             "Writing the configured note if the feature is available ..."
           );
           await bookingPage
-            .waitForSelector("textarea[name=amendment]", { timeout: 5000 })
+            .waitForSelector("textarea[name=amendment]", { timeout: 5 * 1000 })
             .then((handle) => handle.type(config.note))
             .catch((e) =>
-              console.log(
-                "Write note failed with:",
+              console.error(
                 e.message,
-                "\nContinuing with booking with no note"
+                "Write note failed. Continuing with booking with no note."
               )
             );
         }
@@ -175,12 +159,11 @@ async function bookTermin() {
         // Telephone entry is not available for every location.
         console.log("Looking for the telephone input ...");
         const telephoneHandle = await bookingPage
-          .waitForSelector("input#telephone", { timeout: 5000 })
+          .waitForSelector("input#telephone", { timeout: 5 * 1000 })
           .catch((e) =>
-            console.log(
-              "Did not find telephone input with:",
+            console.error(
               e.message,
-              "\nContinuing with booking without providing a contact number ..."
+              "Did not find telephone input. Continuing with booking without providing a contact number ..."
             )
           );
 
@@ -189,10 +172,9 @@ async function bookTermin() {
           await telephoneHandle
             .evaluate((el, config) => (el.value = config.phone), config)
             .catch((e) => {
-              console.log(
-                "Writing phone number failed with:",
+              console.error(
                 e.message,
-                "\nCancelling form submission"
+                "Writing phone number failed. Cancelling form submission."
               );
               throw e;
             });
@@ -207,7 +189,7 @@ async function bookTermin() {
         try {
           // TODO: validate the booking confirmation rather than just waiting 10 seconds.
           console.log("Waiting 10 seconds for booking result to render ...");
-          await bookingPage.waitForTimeout(10000);
+          await bookingPage.waitForTimeout(10 * 1000);
 
           console.log("Saving booking info to files ...");
           await Promise.allSettled([
@@ -225,8 +207,8 @@ async function bookTermin() {
             }),
           ]);
         } catch (e) {
-          console.log(e);
-          console.log(
+          console.error(
+            e.message,
             "Error thrown during booking confirmation. Exiting. Check your config.email address for booking info."
           );
         }
@@ -234,17 +216,14 @@ async function bookTermin() {
         console.log("Success!!!");
         return true;
       } catch (e) {
-        console.log(
-          "Booking timeslot failed for:",
-          bookingPageUrl,
-          "with:",
+        console.error(
           e.message,
-          "\nTrying the next one now."
+          `Booking timeslot failed for: ${bookingPageURL}. Trying the next timeslot now.`
         );
       }
     }
   } catch (e) {
-    console.log(e);
+    console.error(e);
     return false;
   } finally {
     if (browser !== undefined) await browser.close();
@@ -259,11 +238,13 @@ const withPage =
     await applyStealth(page);
     try {
       return await fn(page);
-    } catch {
+    } catch (e) {
+      console.error(e);
       // If error, always close page
-      await page.close();
+      if (!(await page.isClosed())) await page.close();
     } finally {
-      if (options.close) await page.close();
+      if (options.alwaysClosePage && !(await page.isClosed()))
+        await page.close();
     }
   };
 
@@ -273,63 +254,62 @@ const applyStealth = (page) =>
       url: "https://raw.githack.com/berstend/puppeteer-extra/stealth-js/stealth.min.js",
     })
     .catch((e) =>
-      console.log(
-        "Applying stealth protections failed with:",
+      console.error(
         e.message,
-        "\nContinuing without protection"
+        "Applying stealth protections failed. Continuing without protection"
       )
     );
 
-function getCalendarLink(service, allLocations, locations) {
-  let link = constants.entryUrl;
-  link += constants.services[service] + "%2F";
-  link += "&anliegen[]=";
-  link += constants.services[service];
-  link += "&dienstleisterlist=";
+function getCalendarURL({ service, allLocations, locations }) {
+  let url = constants.entryUrl;
+  url += constants.services[service] + "%2F";
+  url += "&anliegen[]=";
+  url += constants.services[service];
+  url += "&dienstleisterlist=";
   if (allLocations === true) {
     for (const location in constants.locations) {
-      link += constants.locations[location] + ",";
+      url += constants.locations[location] + ",";
     }
   } else {
     for (let i = 0; i < locations.length; i++) {
-      link += constants.locations[locations[i]] + ",";
+      url += constants.locations[locations[i]] + ",";
     }
   }
-  link = link.slice(0, link.length - 1);
-  return link;
+  url = url.slice(0, url.length - 1);
+  return url;
 }
 
-async function getAllDateLinks(page) {
-  console.log("Getting available date links from calendar");
-  const linksPage1 = await getDateLinks(page);
-  console.log("Got date links:", JSON.stringify(linksPage1, null, 2));
+async function getAllDateURLs(page) {
+  console.log("Getting available date URLs from calendar");
+  const linksPage1 = await getDateURLs(page);
+  console.log("Got date URLs:", JSON.stringify(linksPage1, null, 2));
   await paginateCalendar(page);
-  const linksPage2 = await getDateLinks(page);
-  console.log("Got date links:", JSON.stringify(linksPage2, null, 2));
-  const links = linksPage1.concat(linksPage2);
-  console.log(
-    "Unique date links:",
-    JSON.stringify([...new Set(links)], null, 2)
-  );
-  return [...new Set(links)];
+  const linksPage2 = await getDateURLs(page);
+  console.log("Got date URLs:", JSON.stringify(linksPage2, null, 2));
+  const urls = linksPage1.concat(linksPage2);
+  console.log("Unique date URLs:", JSON.stringify([...new Set(urls)], null, 2));
+  return [...new Set(urls)];
 }
 
-async function getDateLinks(page) {
+async function getDateURLs(page) {
   // Selector might not be there so don't bother waiting for it.
   return await page.$$eval("td.buchbar > a", (els) =>
-    els
-      .map((el) => el.href)
-      .filter((href) => href !== undefined && href !== null)
+    els.map((el) => el.href).filter((href) => !!href)
   );
 }
 
 async function paginateCalendar(page) {
-  await Promise.all([page.waitForNavigation(), page.click("th.next")]);
+  const NEXT_BUTTON_SELECTOR = "th.next";
+  await page.waitForSelector(NEXT_BUTTON_SELECTOR);
+  await Promise.all([
+    page.waitForNavigation(),
+    page.click(NEXT_BUTTON_SELECTOR),
+  ]);
 }
 
-function filterLinksBetweenDates(links, earliestDate, latestDate) {
-  return links.filter((link) => {
-    const linkDate = new Date(parseInt(link.match(/\d+/)[0]) * 1000);
+function filterURLsBetweenDates(urls, { earliestDate, latestDate }) {
+  return urls.filter((url) => {
+    const linkDate = new Date(parseInt(url.match(/\d+/)[0]) * 1000);
     if (new Date(earliestDate) <= linkDate <= new Date(latestDate)) {
       return true;
     }
@@ -337,25 +317,23 @@ function filterLinksBetweenDates(links, earliestDate, latestDate) {
   });
 }
 
-async function getTimeslotLinks(page) {
+async function getTimeslotURLs(page) {
   // Selector should definitely be there so wait for it. Sometimes not so return [] on fail.
-  const links = await page
+  const urls = await page
     .waitForSelector("td.frei > a")
     .then(() =>
       page.$$eval("td.frei > a", (els) =>
-        els
-          .map((el) => el.href)
-          .filter((href) => href !== undefined && href !== null)
+        els.map((el) => el.href).filter((href) => !!href)
       )
     )
     .catch(() => []);
-  console.log("Got timeslot links:", JSON.stringify(links, null, 2));
-  return links;
+  console.log("Got timeslot URLs:", JSON.stringify(urls, null, 2));
+  return urls;
 }
 
-function filterLinksBetweenTimes(links, earliestTime, latestTime) {
-  return links.filter((link) => {
-    const linkDate = new Date(parseInt(link.match(/\d+/)[0]) * 1000);
+function filterURLsBetweenTimes(urls, { earliestTime, latestTime }) {
+  return urls.filter((url) => {
+    const linkDate = new Date(parseInt(url.match(/\d+/)[0]) * 1000);
     const linkTime = `${linkDate.getHours()}:${linkDate.getMinutes()} GMT`;
     if (
       new Date("1970 " + earliestTime) <=
@@ -368,6 +346,6 @@ function filterLinksBetweenTimes(links, earliestTime, latestTime) {
   });
 }
 
-function sleep(ms) {
+function sleep(ms = 120000) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
