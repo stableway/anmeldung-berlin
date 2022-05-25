@@ -21,7 +21,7 @@ const config = require("./config.json");
         config.waitSeconds,
         "seconds until next attempt ..."
       );
-      await sleep(config.waitSeconds * 1000 * 1000);
+      await sleep(config.waitSeconds * 1000);
     }
   }
   console.log("Ending: " + timestamp());
@@ -310,10 +310,7 @@ async function paginateCalendar(page) {
 function filterURLsBetweenDates(urls, { earliestDate, latestDate }) {
   return urls.filter((url) => {
     const linkDate = new Date(parseInt(url.match(/\d+/)[0]) * 1000);
-    if (new Date(earliestDate) <= linkDate <= new Date(latestDate)) {
-      return true;
-    }
-    return false;
+    return new Date(earliestDate) <= linkDate && linkDate <= new Date(latestDate);
   });
 }
 
@@ -335,14 +332,7 @@ function filterURLsBetweenTimes(urls, { earliestTime, latestTime }) {
   return urls.filter((url) => {
     const linkDate = new Date(parseInt(url.match(/\d+/)[0]) * 1000);
     const linkTime = `${linkDate.getHours()}:${linkDate.getMinutes()} GMT`;
-    if (
-      new Date("1970 " + earliestTime) <=
-      new Date("1970 " + linkTime) <=
-      new Date("1970 " + latestTime)
-    ) {
-      return true;
-    }
-    return false;
+    return new Date("1970 " + earliestTime) <= new Date("1970 " + linkTime) && new Date("1970 " + linkTime) <= new Date("1970 " + latestTime);
   });
 }
 
