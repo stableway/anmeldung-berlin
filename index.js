@@ -1,11 +1,12 @@
 const fs = require('fs');
 const puppeteer = require('puppeteer');
 const config = {
-    'debug': true,
+    'debug': false,
     'minTimestamp': 1609801200,// Use Berlin time-zone here
     'maxTimestamp': 1612479600,// Use Berlin time-zone here
     'name': 'ADD YOUR FULL NAME HERE',
     'email': 'ADD YOUR EMAIL HERE',
+    'phone': '',// ADD PHONE NUMBER HERE (OPTIONAL)
     'moreDetails': '',// ADD FURTHER DETAILS HERE (OPTIONAL)
     'takeScreenshot': true,
     'screenshotFile1': 'screenshot1.png',
@@ -41,9 +42,6 @@ async function bookTermin() {
     const browser = await puppeteer.launch({
   		headless: !config.debug,
         defaultViewport: null,
-        // Uncomment the lines below if you are using a Raspberry to run the script
-        //product: 'chrome',
-        //executablePath: '/usr/bin/chromium-browser',
         args: ['--no-sandbox', '--disable-setuid-sandbox']
   	});
     const page = await browser.newPage();
@@ -65,6 +63,11 @@ async function bookTermin() {
 
         // Check if there are Termins available
         let available = (await page.$$('td.buchbar')).length;
+        // If no Termins available, move to next month
+        if(available == 0){
+            await page.click('th.next > a');
+            available = (await page.$$('td.buchbar')).length;
+        }
         console.log('Available Termins: ' + available);
 
         // If there are bookable Termins
@@ -82,7 +85,7 @@ async function bookTermin() {
                     console.log('Booking step 1');
 
                     await page.waitForSelector('tr > td.frei', { timeout: 120000 });
-                    const termins = await page.$$('tr > td.frei');
+                    const termins = await page.$$('tr > td.frei > a');
                     await termins[0].click();
                     console.log('Booking step 2');
 
@@ -90,7 +93,10 @@ async function bookTermin() {
                     await page.waitForSelector('input[id="familyName"]', { timeout: 120000 });
                     await page.type('input[id="familyName"]', config.name);
                     await page.type('input[id="email"]', config.email);
-                    await page.type('textarea[name="amendment"]', config.moreDetails);
+                    if(config.phone != "")
+                        await page.type('input[id="telephone"]', config.phone);
+                    if(config.moreDetails != "")
+                        await page.type('textarea[name="amendment"]', config.moreDetails);
                     console.log('Booking step 3');
 
                     // Fill out standard information
