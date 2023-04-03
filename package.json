@@ -11,10 +11,14 @@
   "license": "MIT",
   "dependencies": {
     "bluebird": "^3.7.2",
-    "puppeteer": "^10.4.0"
+    "puppeteer": "^19.8.2",
+    "puppeteer-extra": "^3.3.6",
+    "puppeteer-extra-plugin-stealth": "^2.11.2",
+    "winston": "^3.8.2"
   },
   "devDependencies": {
     "eslint": "^7.32.0",
-    "eslint-config-prettier": "^8.3.0"
+    "eslint-config-prettier": "^8.3.0",
+    "prettier": "2.8.7"
   }
 }

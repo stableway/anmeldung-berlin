@@ -10,27 +10,26 @@ This app will find and book an Anmeldung appointment automatically for you in Be
 vi config.json
 ```
 
-Variable | Default | Required
+Variable | Default | Description
 ---------|----------|---------
- `debug` | `false` | `false`
- `name` | `"Max Mustermann"` | `true`
- `email` | `"max.mustermann@domain.com"` | `true`
- `phone` | `"0176 55555555"` | `true`
- `takeSurvey` | `true` | `false`
- `note` | `""` | `false`
- `service` | `"Anmeldung einer Wohnung"` | `true`**
- `allLocations` | `true` | `false`*
- `locations` | `["Bürgeramt Rathaus Neukölln", "Bürgeramt Rathaus Neukölln - Vorzugsterminen"]` | `false`**
- `earliestDate` | `"1970-01-01 GMT"` | `true`
- `latestDate` | `"2069-01-01 GMT"` | `true`
- `earliestTime` | `"08:00 GMT"` | `true`
- `latestTime` | `"18:00 GMT"` | `true`
- `concurrency` | `3` | `false`
- `waitSeconds` | `120` | `false`
+ `debug` | `false` | Run a headful browser
+ `name` | `"Max Mustermann"` | Your full name
+ `email` | `"max.mustermann@domain.com"` | Your email
+ `phone` | `"0176 55555555"` | Your phone number
+ `takeSurvey` | `true` | Whether or not to take the Amt's survey
+ `note` | `""` | An optional note to include with your booking
+ `service` | `"Anmeldung einer Wohnung"` | The name of the appointment service from [./constants.json](./constants.json)
+ `allLocations` | `true` | Include all service locations*
+ `locations` | `["Bürgeramt Rathaus Neukölln", "Bürgeramt Rathaus Neukölln - Vorzugsterminen"]` | Specific service locations to search from [./constants.json](./constants.json)
+ `earliestDate` | `"1970-01-01 GMT"` | Book an appointment no earlier than this date
+ `latestDate` | `"2069-01-01 GMT"` | Book an appointment no later than this date
+ `earliestTime` | `"05:00 GMT"` | Book an appointment no earlier than this time
+ `latestTime` | `"18:00 GMT"` | Book an appointment no later than this time
+ `concurrency` | `3` | How many Chromium pages to run at the same time
+ `waitSeconds` | `120` | How long to wait between booking attempts
+ `coolOffSeconds` | `600` | How long to wait if blocked for too many attempts
 
-*Either `allLocations` or `locations` must be defined.
-
-**A list of allowed `locations` and `services` is available in [./constants.json](./constants.json)
+*`allLocations` will override `locations`
 
 ### With Docker (recommended)
 
@@ -72,6 +71,6 @@ If you're planning to contribute to the project, install dev dependencies and us
 
 ```bash
 npm i --include=dev
-eslint --fix index.js # caution: this will modify index.js in place
-prettier -w index.js # caution: this will modify index.js in place
+npx eslint --fix index.js # caution: this will modify index.js in place
+npx prettier -w index.js # caution: this will modify index.js in place
 ```
