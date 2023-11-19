@@ -153,6 +153,7 @@ async function bookTermin() {
             await Promise.all([
               page.waitForSelector("input#familyName"),
               page.waitForSelector("input#email"),
+              page.waitForSelector("input#emailequality"),
               page.waitForSelector('select[name="surveyAccepted"]'),
               page.waitForSelector("input#agbgelesen"),
               page.waitForSelector("button#register_submit.btn"),
@@ -178,6 +179,11 @@ async function bookTermin() {
           ),
           bookingPage.$eval(
             "input#email",
+            (el, config) => (el.value = config.email),
+            config
+          ),
+          bookingPage.$eval(
+            "input#emailequality",
             (el, config) => (el.value = config.email),
             config
           ),
