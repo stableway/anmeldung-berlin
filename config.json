@@ -1,7 +1,7 @@
 {
-    "debug": true,
-    "name": "George Hamilton",
-    "email": "bistro04_comic@icloud.com",
+    "debug": false,
+    "name": "Max Mustermann",
+    "email": "max.mustermann@domain.com",
     "phone": "0176 55555555",
     "takeSurvey": true,
     "note": "",
@@ -15,7 +15,7 @@
     "latestDate": "2069-01-01 GMT",
     "earliestTime": "05:00 GMT",
     "latestTime": "18:00 GMT",
-    "concurrency": 6,
-    "waitSeconds": 30,
+    "concurrency": 3,
+    "waitSeconds": 60,
     "coolOffSeconds": 600
 }
