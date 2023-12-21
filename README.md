@@ -2,9 +2,17 @@
 
 This app will find and book an Anmeldung appointment automatically for you in Berlin.
 
-## Quickstart
+## Run the Bot: Step-By-Step
 
-### Configuration
+### 1. Get a MailSlurp API Key
+
+Get a [MailSlurp API key here](https://app.mailslurp.com/sign-up/). Set your API key to value of the environment variable `MAILSLURP_API_KEY`.
+
+```bash
+export MAILSLURP_API_KEYU=*your-api-key*
+```
+
+### 2. Configuration
 
 ```bash
 vi config.json
@@ -31,24 +39,47 @@ Variable | Default | Description
 
 *`allLocations` will override `locations`
 
-### With Docker (recommended)
+### 3. Update Stealth Evasions
+
+```bash
+npx extract-stealth-evasions
+```
+
+### 4a. Run with Docker (recommended)
+
+Build & run Docker container.
 
 ```bash
 # Build
 docker build -t anmeldung-berlin .
 # Get an appointment
-docker run \
-    -v $(pwd)/output:/home/myuser/output \
+docker run -it \
+    -v $(pwd)/output:/home/pwuser/output \
+    -e MAILSLURP_API_KEY=*your-api-key* \
     anmeldung-berlin
 ```
 
-### Local on Mac OS
+You'll get a bash shell. Start the program:
 
 ```bash
-# Install
+npm start
+```
+
+### 4b. Run locally on Mac OS
+
+Update stealth evasions.
+
+```bash
+npx extract-stealth-evasions
+```
+
+```bash
+# Install dependencies
 npm i
+# Install browsers
+npx playwright install
 # Get an appointment
-NODE_OPTIONS="--max_old_space_size=30000 --max-http-header-size=80000" \
+NODE_OPTIONS="--max_old_space_size=16000 --max-http-header-size=80000" \
     npm start
 ```
 
@@ -71,6 +102,6 @@ If you're planning to contribute to the project, install dev dependencies and us
 
 ```bash
 npm i --include=dev
-npx eslint --fix index.js # caution: this will modify index.js in place
-npx prettier -w index.js # caution: this will modify index.js in place
+npx eslint --fix tests/
+npx prettier -w tests
 ```

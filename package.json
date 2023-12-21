@@ -2,23 +2,25 @@
   "name": "anmeldung-berlin",
   "version": "0.0.1",
   "description": "This script will find and book an Anmeldung appointment automatically for you in Berlin",
-  "main": "index.js",
   "scripts": {
-    "start": "node index.js",
+    "start": "npx playwright test appointment.test.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "author": "Daniel Cortez Stevenson",
   "license": "MIT",
   "dependencies": {
+    "@playwright/test": "^1.40.1",
     "bluebird": "^3.7.2",
-    "puppeteer": "^19.8.2",
-    "puppeteer-extra": "^3.3.6",
-    "puppeteer-extra-plugin-stealth": "^2.11.2",
+    "fs": "^0.0.1-security",
+    "mailslurp-client": "^15.17.4",
     "winston": "^3.8.2"
   },
   "devDependencies": {
     "eslint": "^7.32.0",
     "eslint-config-prettier": "^8.3.0",
     "prettier": "2.8.7"
+  },
+  "engine": {
+    "node": ">=17.0.0"
   }
 }

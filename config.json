@@ -1,11 +1,11 @@
 {
-    "debug": false,
-    "name": "Max Mustermann",
-    "email": "max.mustermann@domain.com",
+    "debug": true,
+    "name": "George Hamilton",
+    "email": "bistro04_comic@icloud.com",
     "phone": "0176 55555555",
     "takeSurvey": true,
     "note": "",
-    "service": "Anmeldung einer Wohnung",
+    "service":  "Anmeldung einer Wohnung",
     "allLocations": true,
     "locations": [
         "Bürgeramt Rathaus Neukölln",
@@ -15,7 +15,7 @@
     "latestDate": "2069-01-01 GMT",
     "earliestTime": "05:00 GMT",
     "latestTime": "18:00 GMT",
-    "concurrency": 3,
-    "waitSeconds": 120,
+    "concurrency": 6,
+    "waitSeconds": 30,
     "coolOffSeconds": 600
 }
