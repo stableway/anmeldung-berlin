@@ -59,19 +59,9 @@ docker run -it \
     anmeldung-berlin
 ```
 
-You'll get a bash shell. Start the program:
-
-```bash
-npm start
-```
-
 ### 4b. Run locally on Mac OS
 
-Update stealth evasions.
-
-```bash
-npx extract-stealth-evasions
-```
+Run the program from the command line.
 
 ```bash
 # Install dependencies
@@ -79,13 +69,13 @@ npm i
 # Install browsers
 npx playwright install
 # Get an appointment
-NODE_OPTIONS="--max_old_space_size=16000 --max-http-header-size=80000" \
+NODE_OPTIONS="--max_old_space_size=4000 --max-http-header-size=80000" \
     npm start
 ```
 
 ## Output
 
-The [./output](./output) directory will save a picture of the appointment confirmation page and a JSON file with appointment info. Check your `email` inbox (and spam folder) for the appointment confirmation.
+The [./output](./output) directory will save one or two .html files that are the body of the emails received during the booking process. There will also be an .ics file to add to your calendar. Check your MailSlurp email inbox for the appointment confirmations.
 
 ## Known Issues
 
