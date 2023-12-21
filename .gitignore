@@ -1,3 +1,6 @@
 output/*
 !output/.gitkeep
 node_modules
+playwright-report/
+test-results/
+*.min.js

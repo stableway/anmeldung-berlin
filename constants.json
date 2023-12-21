@@ -2,7 +2,8 @@
     "entryUrl": "https://service.berlin.de/terminvereinbarung/termin/tag.php?termin=1&herkunft=http%3A%2F%2Fservice.berlin.de%2Fdienstleistung%2F",
     "services": {
         "Anmeldung einer Wohnung": 120686,
-        "Blaue Karte EU auf einen neuen Pass übertragen": 326798
+        "Blaue Karte EU auf einen neuen Pass übertragen": 326798,
+        "Aufenthaltserlaubnis zum Studium": 305244
     },
     "locations": {
         "Bürgeramt Halemweg (Außenstelle)": 122210,
@@ -89,6 +90,7 @@
         "Bürgeramt I in Köpenick": 122208,
         "Bürgeramt I in Köpenick - Vorzugstermine": 327298,
         "Bürgeramt II in Schöneweide": 122226,
-        "Bürgeramt II in Schöneweide - Vorzugstermine": 327300
+        "Bürgeramt II in Schöneweide - Vorzugstermine": 327300,
+        "LEA": 327437
     }
 }
