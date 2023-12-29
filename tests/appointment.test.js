@@ -3,7 +3,6 @@ const fs = require("fs").promises;
 const MailSlurp = require("mailslurp-client").default;
 const Promise = require("bluebird");
 const winston = require("winston");
-const constants = require("../constants.json");
 const config = require("../config.json");
 
 const logger = winston.createLogger({
@@ -22,33 +21,29 @@ const logger = winston.createLogger({
   level: config.debug ? "debug" : "info",
 });
 
+
+test.beforeEach(async ({context}) => {
+  await context.addInitScript({ path: "stealth.min.js" });
+});
+
 // eslint-disable-next-line no-empty-pattern
 test.afterEach(async ({}, testInfo) => {
   if (testInfo.status !== testInfo.expectedStatus) {
     logger.info(`Waiting ${config.waitSeconds} seconds before retrying ...`);
-    await sleep(config.waitSeconds * 1000);
+    if (testInfo.error.message === "Rate limit exceeded") {
+      await sleep(config.coolOffSeconds * 1000);
+    } else {
+      await sleep(config.waitSeconds * 1000);
+    }
   }
 });
 
 test("appointment", async ({ context }) => {
-  await context.addInitScript({ path: "stealth.min.js" });
-
-  const dateURLs = await getDateURLs(await context.newPage());
+  const serviceURL = await getServiceURL(context, config);
+  const dateURLs = await getDateURLs(context, serviceURL, config);
   expect(dateURLs.length).toBeGreaterThan(0);
 
-  const appointmentURLs = [].concat.apply(
-    [],
-    await Promise.map(
-      dateURLs,
-      async (url) =>
-        getAppointmentURLs(await context.newPage(), url).catch((e) => {
-          // If one URL fails, just return [] and go ahead with the URLs you could find.
-          logger.error(`Get appointments failed for ${url} - ${e.message}`);
-          return [];
-        }),
-      { concurrency: config.concurrency || 3 }
-    )
-  );
+  const appointmentURLs = getAppointmentURLs(context, dateURLs);
   expect(appointmentURLs.length).toBeGreaterThan(0);
 
   for (const appointmentURL of appointmentURLs) {
@@ -69,27 +64,44 @@ function timestamp() {
   return new Date(Date.now()).toUTCString();
 }
 
-async function getDateURLs(page) {
-  return await test.step("get date urls", async () => {
-    const calendarURL = getCalendarURL(config);
-    logger.info("Navigating to the appointment calendar");
-    logger.debug(`Calendar URL: ${calendarURL}`);
-    await page.goto(calendarURL, { waitUntil: "domcontentloaded" });
+async function getServiceURL(context, {service}) {
+  return await test.step("get service url", async () => {
+    const page = await context.newPage();
+    const servicesURL = "https://service.berlin.de/dienstleistungen/";
+    await page.goto(servicesURL, { waitUntil: "domcontentloaded" });
     await checkRateLimitExceeded(page);
     await checkCaptcha(page);
-    if (
-      page.url() ===
-      "https://service.berlin.de/terminvereinbarung/termin/taken/"
-    ) {
-      throw new Error("No appointments available. Exiting.");
-    }
+    const serviceLinkLocator = page.getByRole("link", { name: service });
+    await expect(serviceLinkLocator, `Service ${service} not found at ${servicesURL}`).toBeVisible();
+    const serviceUrl = await serviceLinkLocator.getAttribute("href");
+    await page.close();
+    return serviceUrl;
+  });
+}
 
+async function getDateURLs(context, serviceURL, config) {
+  return await test.step("get date urls", async () => {
+    const page = await context.newPage();
+    await page.goto(serviceURL, { waitUntil: "domcontentloaded" });
+    await checkRateLimitExceeded(page);
+    await checkCaptcha(page);
+    await selectLocations(page, config);
+    logger.info("Navigating to the appointment calendar");
+    await Promise.all([
+      page.waitForNavigation({ waitUntil: "domcontentloaded"}), 
+      page.getByRole("button", { name: "An diesem Standort einen Termin buchen" }).click()
+    ]);
+    await checkRateLimitExceeded(page);
+    await checkCaptcha(page);
+    await expect(page, "No appointments available for the selected locations").not.toHaveURL(/service\.berlin\.de\/terminvereinbarung\/termin\/taken/, { timeout: 1 });
     // TODO: Check for maintenance page "Wartung"
     // if (page.getByRole("heading", { name: "Wartung" }).isVisible()) {
     //   throw new Error("Site down for maintenance. Exiting.");
     // }
+    logger.debug(`Calendar url: ${page.url()}`);
     const dateURLsPage1 = await scrapeDateURLs(page);
-    await Promise.all([page.waitForNavigation(), page.click("th.next")]);
+    // TODO: use page.getByRole for pagination button
+    await Promise.all([page.waitForNavigation({waitUntil: "domcontentloaded"}), page.locator("th.next").click()]);
     const dateURLsPage2 = await scrapeDateURLs(page);
     const dateURLs = [...new Set(dateURLsPage1.concat(dateURLsPage2))];
     logger.info(`Found ${dateURLs.length} appointment dates.`);
@@ -97,11 +109,53 @@ async function getDateURLs(page) {
     logger.info(
       `Found ${filteredDateURLs.length} appointment dates within the configured date range.`
     );
+    await page.close();
     return filteredDateURLs;
   });
 }
 
-async function getAppointmentURLs(page, url) {
+async function selectLocations(page, {allLocations, locations}) {
+  await test.step("select locations", async () => {
+    if (allLocations === true) {
+      const allLocationsCheckboxLocator = page.getByRole("checkbox", { name: "Alle Standorte auswählen" });
+      if (await allLocationsCheckboxLocator.isVisible()) {
+        await allLocationsCheckboxLocator.check();
+      } else {
+        const checkboxLocators = page.getByRole("checkbox");
+        const checkboxCount = await checkboxLocators.count();
+        for (let i = 0; i < checkboxCount; ++i) {
+          await checkboxLocators.nth(i).check();
+        }
+      }
+    } else {
+      for (const location of locations) {
+        // TODO: Some other method than first()? This locator can have multiple matches.
+        await page.getByRole("checkbox", {name: location}).first().check();
+      }
+    }
+  });
+}
+
+
+async function getAppointmentURLs(context, dateURLs) {
+  return await test.step("get appointment urls", async () => {
+    return await [].concat.apply(
+      [],
+      await Promise.map(
+        dateURLs,
+        async (url) =>
+          getAppointmentURLsForDateURL(await context.newPage(), url).catch((e) => {
+            // If one URL fails, just return [] and go ahead with the URLs you could find.
+            logger.error(`Get appointments failed for ${url} - ${e.message}`);
+            return [];
+          }),
+        { concurrency: config.concurrency || 3 }
+      )
+    );
+  });
+}
+
+async function getAppointmentURLsForDateURL(page, url) {
   return await test
     .step(`get appointment urls for ${url}`, async () => {
       logger.info(`Getting appointments for ${url}`);
@@ -357,25 +411,6 @@ async function bookAppointment(page, url) {
     });
 }
 
-function getCalendarURL({ service, allLocations, locations }) {
-  let url = constants.entryUrl;
-  url += constants.services[service] + "%2F";
-  url += "&anliegen[]=";
-  url += constants.services[service];
-  url += "&dienstleisterlist=";
-  if (allLocations === true) {
-    for (const location in constants.locations) {
-      url += constants.locations[location] + ",";
-    }
-  } else {
-    for (let i = 0; i < locations.length; i++) {
-      url += constants.locations[locations[i]] + ",";
-    }
-  }
-  url = url.slice(0, url.length - 1);
-  return url;
-}
-
 async function scrapeDateURLs(page) {
   return await page
     .locator("td.buchbar > a")
@@ -414,26 +449,10 @@ function sleep(ms = 120000) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-async function checkRateLimitExceeded(page) {
-  if (await page.getByText("Zu viele Zugriffe").isVisible()) {
-    logger.warn(
-      `Blocked for too many attempts! Waiting for ${config.coolOffSeconds} seconds ...`
-    );
-    await sleep(config.coolOffSeconds * 1000);
-    throw new Error("Blocked for too many attempts! Exiting.");
-  }
+function checkRateLimitExceeded(page) {
+  return expect(page.getByText("Zu viele Zugriffe"), "Rate limit exceeded").not.toBeVisible({ timeout: 1})
 }
 
-async function checkCaptcha(page) {
-  if (
-    await page
-      .getByRole("heading", { name: "Bitte verifizieren sie sich" })
-      .isVisible()
-  ) {
-    logger.warn(
-      `Blocked by captcha! Waiting for ${config.coolOffSeconds} seconds ...`
-    );
-    await sleep(config.coolOffSeconds * 1000);
-    throw new Error("Blocked by captcha! Exiting.");
-  }
+function checkCaptcha(page) {
+  return expect(page.getByRole("heading", { name: "Bitte verifizieren sie sich" }), "Blocked by captcha").not.toBeVisible({ timeout: 1})
 }
