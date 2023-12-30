@@ -89,7 +89,7 @@ The [./output](./output) directory will save one or two .html files that are the
 
 ## Other Services' Appointments
 
-Two services are available (Anmeldung and Change of Passport for EU Blue Card), and this project can be easily extended to include other services' appointments by adding service names and numbers to [./constants.json](./constants.json).
+This app works for any [service.berlin.de](https://service.berlin.de) appointment that can be booked online!
 
 ## Contributing
 
