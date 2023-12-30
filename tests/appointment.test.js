@@ -21,18 +21,22 @@ const logger = winston.createLogger({
   level: config.debug ? "debug" : "info",
 });
 
-
-test.beforeEach(async ({context}) => {
+test.beforeEach(async ({ context }) => {
   await context.addInitScript({ path: "stealth.min.js" });
 });
 
 // eslint-disable-next-line no-empty-pattern
-test.afterEach(async ({}, testInfo) => {
+test.afterEach(async ({ context }, testInfo) => {
+  await context.close();
   if (testInfo.status !== testInfo.expectedStatus) {
-    logger.info(`Waiting ${config.waitSeconds} seconds before retrying ...`);
+    logger.warn(`Appointment booking failed: ${testInfo.error.message}`);
+  }
+  if (testInfo.retry) {
     if (testInfo.error.message === "Rate limit exceeded") {
+      logger.info(`Waiting ${config.coolOffSeconds} seconds then retrying`);
       await sleep(config.coolOffSeconds * 1000);
     } else {
+      logger.info(`Waiting ${config.waitSeconds} seconds then retrying`);
       await sleep(config.waitSeconds * 1000);
     }
   }
@@ -41,19 +45,23 @@ test.afterEach(async ({}, testInfo) => {
 test("appointment", async ({ context }) => {
   const serviceURL = await getServiceURL(context, config);
   const dateURLs = await getDateURLs(context, serviceURL, config);
-  expect(dateURLs.length).toBeGreaterThan(0);
+  expect(dateURLs.length, "No available appointment dates").toBeGreaterThan(0);
 
   const appointmentURLs = getAppointmentURLs(context, dateURLs);
-  expect(appointmentURLs.length).toBeGreaterThan(0);
+  expect(
+    appointmentURLs.length,
+    "No available appointments on any appointment date"
+  ).toBeGreaterThan(0);
 
   for (const appointmentURL of appointmentURLs) {
     try {
-      await bookAppointment(await context.newPage(), appointmentURL);
+      logger.info(`Booking appointment at ${appointmentURL}`);
+      await bookAppointment(await context.newPage(), appointmentURL, config);
       logger.info("Booking successful!");
       return;
     } catch (e) {
       logger.error(
-        `Booking appointment failed ${e.message} for ${appointmentURL}. Trying the next appointment now.`
+        `Booking appointment failed at ${appointmentURL}: ${e.message}`
       );
     }
   }
@@ -64,7 +72,7 @@ function timestamp() {
   return new Date(Date.now()).toUTCString();
 }
 
-async function getServiceURL(context, {service}) {
+async function getServiceURL(context, { service }) {
   return await test.step("get service url", async () => {
     const page = await context.newPage();
     const servicesURL = "https://service.berlin.de/dienstleistungen/";
@@ -72,7 +80,10 @@ async function getServiceURL(context, {service}) {
     await checkRateLimitExceeded(page);
     await checkCaptcha(page);
     const serviceLinkLocator = page.getByRole("link", { name: service });
-    await expect(serviceLinkLocator, `Service ${service} not found at ${servicesURL}`).toBeVisible();
+    await expect(
+      serviceLinkLocator,
+      `Service ${service} not found at ${servicesURL}`
+    ).toBeVisible();
     const serviceUrl = await serviceLinkLocator.getAttribute("href");
     await page.close();
     return serviceUrl;
@@ -88,12 +99,19 @@ async function getDateURLs(context, serviceURL, config) {
     await selectLocations(page, config);
     logger.info("Navigating to the appointment calendar");
     await Promise.all([
-      page.waitForNavigation({ waitUntil: "domcontentloaded"}), 
-      page.getByRole("button", { name: "An diesem Standort einen Termin buchen" }).click()
+      page.waitForNavigation({ waitUntil: "domcontentloaded" }),
+      page
+        .getByRole("button", { name: "An diesem Standort einen Termin buchen" })
+        .click(),
     ]);
     await checkRateLimitExceeded(page);
     await checkCaptcha(page);
-    await expect(page, "No appointments available for the selected locations").not.toHaveURL(/service\.berlin\.de\/terminvereinbarung\/termin\/taken/, { timeout: 1 });
+    await expect(
+      page,
+      "No appointments available for the selected locations"
+    ).not.toHaveURL(/service\.berlin\.de\/terminvereinbarung\/termin\/taken/, {
+      timeout: 1,
+    });
     // TODO: Check for maintenance page "Wartung"
     // if (page.getByRole("heading", { name: "Wartung" }).isVisible()) {
     //   throw new Error("Site down for maintenance. Exiting.");
@@ -101,7 +119,10 @@ async function getDateURLs(context, serviceURL, config) {
     logger.debug(`Calendar url: ${page.url()}`);
     const dateURLsPage1 = await scrapeDateURLs(page);
     // TODO: use page.getByRole for pagination button
-    await Promise.all([page.waitForNavigation({waitUntil: "domcontentloaded"}), page.locator("th.next").click()]);
+    await Promise.all([
+      page.waitForNavigation({ waitUntil: "domcontentloaded" }),
+      page.locator("th.next").click(),
+    ]);
     const dateURLsPage2 = await scrapeDateURLs(page);
     const dateURLs = [...new Set(dateURLsPage1.concat(dateURLsPage2))];
     logger.info(`Found ${dateURLs.length} appointment dates.`);
@@ -114,28 +135,33 @@ async function getDateURLs(context, serviceURL, config) {
   });
 }
 
-async function selectLocations(page, {allLocations, locations}) {
+async function selectLocations(page, { allLocations, locations }) {
   await test.step("select locations", async () => {
     if (allLocations === true) {
-      const allLocationsCheckboxLocator = page.getByRole("checkbox", { name: "Alle Standorte auswählen" });
-      if (await allLocationsCheckboxLocator.isVisible()) {
-        await allLocationsCheckboxLocator.check();
-      } else {
-        const checkboxLocators = page.getByRole("checkbox");
-        const checkboxCount = await checkboxLocators.count();
-        for (let i = 0; i < checkboxCount; ++i) {
-          await checkboxLocators.nth(i).check();
-        }
-      }
+      // Actually click the first checkbox for submit actionability, then check all checkboxes in parallel for speed.
+      const checkboxLocator = page.getByRole("checkbox");
+      await checkboxLocator.first().check();
+      await checkboxLocator.evaluateAll((els) =>
+        els.map((el) => (el.checked = true))
+      );
     } else {
-      for (const location of locations) {
-        // TODO: Some other method than first()? This locator can have multiple matches.
-        await page.getByRole("checkbox", {name: location}).first().check();
-      }
+      // TODO: First location in config.locations must always exist or this will fail.
+      await page
+        .getByRole("checkbox", { name: locations[0], exact: true })
+        .check();
+      await Promise.map(locations, async (location) =>
+        page
+          .getByRole("checkbox", { name: location, exact: true })
+          .evaluate((el) => (el.checked = true))
+          .catch((e) =>
+            logger.warn(
+              `Failed to select location ${location} - Continuing without selecting it: ${e.message}`
+            )
+          )
+      );
     }
   });
 }
-
 
 async function getAppointmentURLs(context, dateURLs) {
   return await test.step("get appointment urls", async () => {
@@ -144,11 +170,13 @@ async function getAppointmentURLs(context, dateURLs) {
       await Promise.map(
         dateURLs,
         async (url) =>
-          getAppointmentURLsForDateURL(await context.newPage(), url).catch((e) => {
-            // If one URL fails, just return [] and go ahead with the URLs you could find.
-            logger.error(`Get appointments failed for ${url} - ${e.message}`);
-            return [];
-          }),
+          getAppointmentURLsForDateURL(await context.newPage(), url).catch(
+            (e) => {
+              // If one URL fails, just return [] and go ahead with the URLs you could find.
+              logger.error(`Get appointments failed for ${url} - ${e.message}`);
+              return [];
+            }
+          ),
         { concurrency: config.concurrency || 3 }
       )
     );
@@ -175,7 +203,7 @@ async function getAppointmentURLsForDateURL(page, url) {
     });
 }
 
-async function bookAppointment(page, url) {
+async function bookAppointment(page, url, config) {
   await test
     .step(`book appointment at ${url}`, async () => {
       logger.info(`Retrieving booking page for ${url}`);
@@ -450,9 +478,15 @@ function sleep(ms = 120000) {
 }
 
 function checkRateLimitExceeded(page) {
-  return expect(page.getByText("Zu viele Zugriffe"), "Rate limit exceeded").not.toBeVisible({ timeout: 1})
+  return expect(
+    page.getByText("Zu viele Zugriffe"),
+    "Rate limit exceeded"
+  ).not.toBeVisible({ timeout: 1 });
 }
 
 function checkCaptcha(page) {
-  return expect(page.getByRole("heading", { name: "Bitte verifizieren sie sich" }), "Blocked by captcha").not.toBeVisible({ timeout: 1})
+  return expect(
+    page.getByRole("heading", { name: "Bitte verifizieren sie sich" }),
+    "Blocked by captcha"
+  ).not.toBeVisible({ timeout: 1 });
 }
