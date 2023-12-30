@@ -20,15 +20,14 @@ vi config.json
 
 Variable | Default | Description
 ---------|----------|---------
- `debug` | `false` | Run a headful browser
  `name` | `"Max Mustermann"` | Your full name
  `email` | `"max.mustermann@domain.com"` | Your email
  `phone` | `"0176 55555555"` | Your phone number
  `takeSurvey` | `true` | Whether or not to take the Amt's survey
  `note` | `""` | An optional note to include with your booking
- `service` | `"Anmeldung einer Wohnung"` | The name of the appointment service from [./constants.json](./constants.json)
+ `service` | `"Anmeldung einer Wohnung"` | The name of the appointment service from this list ([valid service names can be found here](https://service.berlin.de/dienstleistungen/))
  `allLocations` | `true` | Include all service locations*
- `locations` | `["Bürgeramt Rathaus Neukölln", "Bürgeramt Rathaus Neukölln - Vorzugsterminen"]` | Specific service locations to search from [./constants.json](./constants.json)
+ `locations` | `["Bürgeramt Rathaus Neukölln", "Bürgeramt Rathaus Neukölln - Vorzugsterminen"]` | Specific service locations to search ([valid service locations for the service "Anmeldung einer Wohnung" can be found here](https://service.berlin.de/dienstleistung/120686/))
  `earliestDate` | `"1970-01-01 GMT"` | Book an appointment no earlier than this date
  `latestDate` | `"2069-01-01 GMT"` | Book an appointment no later than this date
  `earliestTime` | `"05:00 GMT"` | Book an appointment no earlier than this time
@@ -71,6 +70,12 @@ npx playwright install
 # Get an appointment
 NODE_OPTIONS="--max_old_space_size=4000 --max-http-header-size=80000" \
     npm start
+```
+
+## Debugging
+
+```bash
+npm run debug
 ```
 
 ## Output
