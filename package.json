@@ -4,6 +4,7 @@
   "description": "This script will find and book an Anmeldung appointment automatically for you in Berlin",
   "scripts": {
     "start": "npx playwright test appointment.test.js",
+    "debug": "npx playwright test --headed --trace=on --retries=0 appointment.test.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "author": "Daniel Cortez Stevenson",
