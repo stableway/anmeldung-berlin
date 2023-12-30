@@ -84,8 +84,8 @@ The [./output](./output) directory will save one or two .html files that are the
 
 ## Known Issues
 
-- No verification is made of successful booking. If you click submit, you'll get a 'Success!!!' but double check the booking in the case of bad form inputs.
-- There is a Captcha service that can be triggered, which is not handled.
+- No verification is made of successful booking. Always check your emails and output files for errors.
+- A Captcha can be presented, which is not handled.
 
 ## Other Services' Appointments
 
