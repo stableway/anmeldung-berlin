@@ -54,7 +54,7 @@ docker build -t anmeldung-berlin .
 # Get an appointment
 docker run -it \
     -v $(pwd)/output:/home/pwuser/output \
-    -e MAILSLURP_API_KEY=*your-api-key* \
+    -e MAILSLURP_API_KEY=$MAILSLURP_API_KEY \
     anmeldung-berlin
 ```
 
