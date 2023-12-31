@@ -9,7 +9,7 @@ This app will find and book an Anmeldung appointment automatically for you in Be
 Get a [MailSlurp API key here](https://app.mailslurp.com/sign-up/). Set your API key to value of the environment variable `MAILSLURP_API_KEY`.
 
 ```bash
-export MAILSLURP_API_KEYU=*your-api-key*
+export MAILSLURP_API_KEY=*your-api-key*
 ```
 
 ### 2. Configuration
