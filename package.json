@@ -4,7 +4,7 @@
   "description": "This script will find and book an Anmeldung appointment automatically for you in Berlin",
   "scripts": {
     "start": "npx playwright test appointment.test.js",
-    "debug": "npx playwright test --headed --trace=on --retries=0 appointment.test.js",
+    "debug": "npx playwright test --headed --trace=on appointment.test.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "author": "Daniel Cortez Stevenson",
@@ -12,6 +12,7 @@
   "dependencies": {
     "@playwright/test": "^1.40.1",
     "bluebird": "^3.7.2",
+    "dotenv": "^16.3.1",
     "fs": "^0.0.1-security",
     "mailslurp-client": "^15.17.4",
     "winston": "^3.8.2"

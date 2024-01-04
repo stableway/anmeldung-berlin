@@ -2,7 +2,7 @@
 
 This app will find and book an Anmeldung appointment automatically for you in Berlin.
 
-## Run the Bot: Step-By-Step
+## Quickstart
 
 ### 1. Get a MailSlurp API Key
 
@@ -12,39 +12,15 @@ Get a [MailSlurp API key here](https://app.mailslurp.com/sign-up/). Set your API
 export MAILSLURP_API_KEY=*your-api-key*
 ```
 
-### 2. Configuration
+Check .env file for more configuration options.
 
-```bash
-vi config.json
-```
-
-Variable | Default | Description
----------|----------|---------
- `name` | `"Max Mustermann"` | Your full name
- `email` | `"max.mustermann@domain.com"` | Your email
- `phone` | `"0176 55555555"` | Your phone number
- `takeSurvey` | `true` | Whether or not to take the Amt's survey
- `note` | `""` | An optional note to include with your booking
- `service` | `"Anmeldung einer Wohnung"` | The name of the appointment service from this list ([valid service names can be found here](https://service.berlin.de/dienstleistungen/))
- `allLocations` | `true` | Include all service locations*
- `locations` | `["Bürgeramt Rathaus Neukölln", "Bürgeramt Rathaus Neukölln - Vorzugsterminen"]` | Specific service locations to search ([valid service locations for the service "Anmeldung einer Wohnung" can be found here](https://service.berlin.de/dienstleistung/120686/))
- `earliestDate` | `"1970-01-01 GMT"` | Book an appointment no earlier than this date
- `latestDate` | `"2069-01-01 GMT"` | Book an appointment no later than this date
- `earliestTime` | `"05:00 GMT"` | Book an appointment no earlier than this time
- `latestTime` | `"18:00 GMT"` | Book an appointment no later than this time
- `concurrency` | `3` | How many Chromium pages to run at the same time
- `waitSeconds` | `120` | How long to wait between booking attempts
- `coolOffSeconds` | `600` | How long to wait if blocked for too many attempts
-
-*`allLocations` will override `locations`
-
-### 3. Update Stealth Evasions
+### 2. Update Stealth Evasions
 
 ```bash
 npx extract-stealth-evasions
 ```
 
-### 4a. Run with Docker (recommended)
+### 3a. Run with Docker (recommended)
 
 Build & run Docker container.
 
@@ -54,11 +30,11 @@ docker build -t anmeldung-berlin .
 # Get an appointment
 docker run -it \
     -v $(pwd)/output:/home/pwuser/output \
-    -e MAILSLURP_API_KEY=$MAILSLURP_API_KEY \
+    --env-file ./.env \
     anmeldung-berlin
 ```
 
-### 4b. Run locally on Mac OS
+### 3b. Run Locally on Mac OS
 
 Run the program from the command line.
 
@@ -66,11 +42,36 @@ Run the program from the command line.
 # Install dependencies
 npm i
 # Install browsers
-npx playwright install
+npx playwright install chromium
 # Get an appointment
-NODE_OPTIONS="--max_old_space_size=4000 --max-http-header-size=80000" \
-    npm start
+npm start
 ```
+
+## Environment Variables
+
+```bash
+vi .env
+```
+
+Variable | Default | Description
+---------|----------|---------
+ `MAILSLURP_API_KEY` | `""` | API key for MailSlurp service. [Required]
+ `MAILSLURP_INBOX_ID` | `""` | Inbox ID for MailSlurp service. Use to avoid creating many MailSlurp inboxes.
+ `FORM_NAME` | `"Max Mustermann"` | Your name. [Change]
+ `FORM_PHONE` | `"0176 55555555"` | Your phone number. [Change]
+ `FORM_NOTE` | `""` | Your note for the Amt on your booking. [Change]
+ `FORM_TAKE_SURVEY` | `"false"` | If you want to take the Amt's survey. [Change]
+ `APPT_SERVICE` | `"Anmeldung einer Wohnung"` | Service name for appointment. [Change]
+ `APPT_LOCATIONS` | `""` | Comma separated location names for appointment. [Change]
+ `APPT_EARLIEST_DATE` | `"1970-01-01 GMT"` | Earliest date for appointment (include timezone, for example: 2024-01-23 GMT). [Change]
+ `APPT_LATEST_DATE` | `"2069-01-01 GMT"` | Latest date for appointment (include timezone, for example: 2024-01-29 GMT). [Change]
+ `APPT_EARLIEST_TIME` | `"05:00 GMT"` | Earliest time for appointment (include timezone, for example: 5:00 GMT). [Change]
+ `APPT_LATEST_TIME` | `"18:00 GMT"` | Latest time for appointment (include timezone, for example: 17:00 GMT). [Change]
+ `CONCURRENCY` | `"3"` | Concurrency level for the application.
+ `LOG_LEVEL` | `"info"` | Log level for the application.
+ `PROXY_URL` | `""` | Proxy URL for the application.
+ `RETRY_WAIT_SECONDS` | `"60"` | Wait time in seconds for retrying requests.
+ `RETRY_WAIT_SECONDS_BLOCKED` | `"600"` | Wait time in seconds for retrying when rate limit is exceeded.
 
 ## Debugging
 
@@ -98,5 +99,5 @@ If you're planning to contribute to the project, install dev dependencies and us
 ```bash
 npm i --include=dev
 npx eslint --fix tests/
-npx prettier -w tests
+npx prettier -w tests/
 ```

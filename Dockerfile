@@ -8,8 +8,7 @@ RUN npm i
 
 COPY . .
 
-ENV NODE_OPTIONS="--max_old_space_size=4000 --max-http-header-size=80000"
-ENV MAILSLURP_API_KEY=""
+ENV NODE_ENV=production
 
 ENTRYPOINT [ "npm" ]
 
