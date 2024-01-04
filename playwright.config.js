@@ -1,3 +1,6 @@
+if (process.env.NODE_ENV !== 'production') {
+  require('dotenv').config();
+}
 const { defineConfig, devices } = require('@playwright/test');
 
 module.exports = defineConfig({
