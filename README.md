@@ -23,7 +23,6 @@ Build & run Docker container.
 docker build -t anmeldung-berlin .
 # Get an appointment
 docker run \
-    -p 9323:9323 \
     -v $(pwd)/playwright-report:/home/pwuser/playwright-report \
     -v $(pwd)/test-results:/home/pwuser/test-results \
     -e MAILSLURP_API_KEY=*your-api-key* \
