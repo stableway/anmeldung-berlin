@@ -1,25 +1,29 @@
-if (process.env.NODE_ENV !== 'production') {
-  require('dotenv').config();
-}
 const { defineConfig, devices } = require('@playwright/test');
 
 module.exports = defineConfig({
-  name: "chromium",
   testDir: './tests/',
-  retries: 10_000,
   timeout: 0,
-  reporter: 'html',
+  reporter: [['html', { open: 'never' }]],
   use: {
     ...devices['Desktop Chrome'],
+    ignoreHTTPSErrors: true,
+    bypassCSP: true,
     launchOptions: {
-        args: ["--no-sandbox", "--disable-setuid-sandbox"],
+      args: ["--no-sandbox", "--disable-setuid-sandbox"],
     },
-    contextOptions: {
-        bypassCSP: true,
-        ignoreHTTPSErrors: true,
-        proxy: process.env.PROXY_URL ? { server: process.env.PROXY_URL } : undefined,
-    },
+    proxy: process.env.PROXY_URL ? { server: process.env.PROXY_URL } : undefined,
     actionTimeout: 10 * 1000,
     navigationTimeout: 60 * 1000,
   },
+  projects: [
+    {
+      name: 'stealth',
+      testMatch: /stealth\.setup\./,
+    },
+    {
+      name: "appointment",
+      testMatch: /appointment\.test\./,
+      dependencies: ['stealth'],
+    },
+  ],
 });

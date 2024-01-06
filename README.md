@@ -1,18 +1,12 @@
 # anmeldung-berlin
 
-This app will find and book an Anmeldung appointment automatically for you in Berlin.
+This app will find and book any [service.berlin.de](https://service.berlin.de) appointment that can be booked online.
 
 ## Quickstart
 
 ### 1. Get a MailSlurp API Key
 
-Get a [MailSlurp API key here](https://app.mailslurp.com/sign-up/). Set your API key to value of the environment variable `MAILSLURP_API_KEY`.
-
-```bash
-export MAILSLURP_API_KEY=*your-api-key*
-```
-
-Check .env file for more configuration options.
+Get a [MailSlurp API key here](https://app.mailslurp.com/sign-up/).
 
 ### 2. Update Stealth Evasions
 
@@ -28,9 +22,13 @@ Build & run Docker container.
 # Build
 docker build -t anmeldung-berlin .
 # Get an appointment
-docker run -it \
-    -v $(pwd)/output:/home/pwuser/output \
-    --env-file ./.env \
+docker run \
+    -p 9323:9323 \
+    -v $(pwd)/playwright-report:/home/pwuser/playwright-report \
+    -v $(pwd)/test-results:/home/pwuser/test-results \
+    -e MAILSLURP_API_KEY=*your-api-key* \
+    -e FORM_NAME=*your-name* \
+    -e FORM_PHONE=*your-phone-number* \
     anmeldung-berlin
 ```
 
@@ -44,53 +42,66 @@ npm i
 # Install browsers
 npx playwright install chromium
 # Get an appointment
-npm start
+MAILSLURP_API_KEY=*your-api-key* FORM_NAME=*your-name* FORM_PHONE=*your-phone-number* \
+    npm start
 ```
 
-## Environment Variables
+## Deployment
+
+Set [playwright.config.js](/playwright.config.js) `retries` to a high number, if you want to run the app locally until a successful booking is made. You may very well be blocked for exceeding a rate limit. In this case, try setting `PROXY_URL` to a back-connect proxy URL.
+
+## Parameters
+
+The app is parameterized via environment variables, which have default values (sometimes `null`) per Playwright Test instance.
 
 ```bash
 vi .env
 ```
 
+For [making an appointmen](/tests/appointment.test.js), the parameters are:
+
+Environment Variable | Parameter Default | Description
+---------|----------|---------
+ `MAILSLURP_API_KEY` | `null` | API key for MailSlurp service. [Required]
+ `MAILSLURP_INBOX_ID` | `null` | Inbox ID for MailSlurp service. Use to avoid creating many MailSlurp inboxes.
+ `FORM_NAME` | `null` | Your name. [Required]
+ `FORM_PHONE` | `null` | Your phone number. [Required]
+ `FORM_NOTE` | `null` | Your note for the Amt on your booking.
+ `FORM_TAKE_SURVEY` | `"false"` | If you want to take the Amt's survey.
+ `APPOINTMENT_SERVICE` | `"Anmeldung einer Wohnung"` | Name of the appointment type.
+ `APPOINTMENT_LOCATIONS` | `null` | Comma separated location names for appointment.
+ `APPOINTMENT_EARLIEST_DATE` | `"1970-01-01 GMT"` | Earliest date for appointment.
+ `APPOINTMENT_LATEST_DATE` | `"2069-12-31 GMT"` | Latest date for appointment.
+ `APPOINTMENT_EARLIEST_TIME` | `"00:00 GMT"` | Earliest time for appointment.
+ `APPOINTMENT_LATEST_TIME` | `"23:59 GMT"` | Latest time for appointment.
+
+## Environment Variables
+
 Variable | Default | Description
 ---------|----------|---------
- `MAILSLURP_API_KEY` | `""` | API key for MailSlurp service. [Required]
- `MAILSLURP_INBOX_ID` | `""` | Inbox ID for MailSlurp service. Use to avoid creating many MailSlurp inboxes.
- `FORM_NAME` | `"Max Mustermann"` | Your name. [Change]
- `FORM_PHONE` | `"0176 55555555"` | Your phone number. [Change]
- `FORM_NOTE` | `""` | Your note for the Amt on your booking. [Change]
- `FORM_TAKE_SURVEY` | `"false"` | If you want to take the Amt's survey. [Change]
- `APPT_SERVICE` | `"Anmeldung einer Wohnung"` | Service name for appointment. [Change]
- `APPT_LOCATIONS` | `""` | Comma separated location names for appointment. [Change]
- `APPT_EARLIEST_DATE` | `"1970-01-01 GMT"` | Earliest date for appointment (include timezone, for example: 2024-01-23 GMT). [Change]
- `APPT_LATEST_DATE` | `"2069-01-01 GMT"` | Latest date for appointment (include timezone, for example: 2024-01-29 GMT). [Change]
- `APPT_EARLIEST_TIME` | `"05:00 GMT"` | Earliest time for appointment (include timezone, for example: 5:00 GMT). [Change]
- `APPT_LATEST_TIME` | `"18:00 GMT"` | Latest time for appointment (include timezone, for example: 17:00 GMT). [Change]
- `CONCURRENCY` | `"3"` | Concurrency level for the application.
- `LOG_LEVEL` | `"info"` | Log level for the application.
- `PROXY_URL` | `""` | Proxy URL for the application.
- `RETRY_WAIT_SECONDS` | `"60"` | Wait time in seconds for retrying requests.
- `RETRY_WAIT_SECONDS_BLOCKED` | `"600"` | Wait time in seconds for retrying when rate limit is exceeded.
+`LOGLEVEL` | "info" | Set to "debug" to get stdout.
+`CONCURRENCY` | "16" | Max number of concurrent Pages.
+`PROXY_URL` | `undefined` | Hide your IP with a back-connect proxy.
 
 ## Debugging
 
 ```bash
-npm run debug
+MAILSLURP_API_KEY=*your-api-key* FORM_NAME=*your-name* FORM_PHONE=*your-phone-number* \
+    npm run debug
 ```
 
 ## Output
 
-The [./output](./output) directory will save one or two .html files that are the body of the emails received during the booking process. There will also be an .ics file to add to your calendar. Check your MailSlurp email inbox for the appointment confirmations.
+[playwright-report](./playwright-report) will contain one or two .html files that are the body of the emails received during the booking process. There will also be an .ics file to add to your calendar. Check your MailSlurp email inbox for the appointment confirmations.
+
+```bash
+npx playwright show-report
+```
 
 ## Known Issues
 
-- No verification is made of successful booking. Always check your emails and output files for errors.
-- A Captcha can be presented, which is not handled.
-
-## Other Services' Appointments
-
-This app works for any [service.berlin.de](https://service.berlin.de) appointment that can be booked online!
+- We don't verify the final booking page. Always check your emails and Playwright report for errors.
+- We can be blocked by a Captcha in some cases.
 
 ## Contributing
 
