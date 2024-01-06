@@ -1,19 +1,16 @@
 {
   "name": "anmeldung-berlin",
   "version": "0.0.1",
-  "description": "This script will find and book an Anmeldung appointment automatically for you in Berlin",
+  "description": "This app will find and book any [service.berlin.de](https://service.berlin.de) appointment that can be booked online.",
   "scripts": {
-    "start": "npx playwright test appointment.test.js",
-    "debug": "npx playwright test --headed --trace=on appointment.test.js",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "start": "npx playwright test --project=appointment",
+    "debug": "LOGLEVEL=debug npx playwright test --headed --trace=on --project=appointment"
   },
   "author": "Daniel Cortez Stevenson",
   "license": "MIT",
   "dependencies": {
     "@playwright/test": "^1.40.1",
     "bluebird": "^3.7.2",
-    "dotenv": "^16.3.1",
-    "fs": "^0.0.1-security",
     "mailslurp-client": "^15.17.4",
     "winston": "^3.8.2"
   },

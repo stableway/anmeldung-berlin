@@ -1,23 +1,20 @@
-const { expect, test } = require("@playwright/test");
-const fs = require("fs").promises;
+const { expect } = require("@playwright/test");
 const MailSlurp = require("mailslurp-client").default;
 const Promise = require("bluebird");
-const winston = require("winston");
-
-const logger = winston.createLogger({
-  format: winston.format.combine(
-    winston.format.colorize(),
-    winston.format.timestamp({
-      format: "YYYY-MM-DD HH:mm:ss",
-    }),
-    winston.format.printf(
-      (info) =>
-        `${info.timestamp} ${info.level}: ${info.message}` +
-        (info.splat !== undefined ? `${info.splat}` : " ")
-    )
-  ),
-  transports: [new winston.transports.Console()],
-  level: process.env.LOG_LEVEL || "info",
+const logger = require("../src/logger");
+const test = require("../src/test.js")({
+  MAILSLURP_API_KEY: null,
+  MAILSLURP_INBOX_ID: null,
+  FORM_NAME: null,
+  FORM_PHONE: null,
+  FORM_NOTE: null,
+  FORM_TAKE_SURVEY: "false",
+  APPOINTMENT_SERVICE: "Anmeldung einer Wohnung",
+  APPOINTMENT_LOCATIONS: null,
+  APPOINTMENT_EARLIEST_DATE: "1970-01-01 GMT",
+  APPOINTMENT_LATEST_DATE: "2069-12-31 GMT",
+  APPOINTMENT_EARLIEST_TIME: "00:00 GMT",
+  APPOINTMENT_LATEST_TIME: "23:59 GMT",
 });
 
 test.beforeEach(async ({ context }) => {
@@ -29,22 +26,15 @@ test.afterEach(async ({ context }, testInfo) => {
   if (testInfo.status !== testInfo.expectedStatus) {
     logger.warn(`Appointment booking failed: ${testInfo.error.message}`);
   }
-  if (testInfo.retry) {
-    let waitSeconds = parseInt(process.env.RETRY_WAIT_SECONDS || "120");
-    if (testInfo.error.message === "Rate limit exceeded") {
-      waitSeconds = parseInt(process.env.RETRY_WAIT_SECONDS_BLOCKED || "600");
-    }
-    logger.info(`Waiting ${waitSeconds} seconds then retrying`);
-    await sleep(waitSeconds * 1000);
-  }
 });
 
-test("appointment", async ({ context }) => {
-  const serviceURL = await getServiceURL(context);
-  const dateURLs = await getDateURLs(context, serviceURL);
+test("appointment", async ({ context, params }, testInfo) => {
+  logger.debug(JSON.stringify(params, null, 2));
+  const serviceURL = await getServiceURL(context, params);
+  const dateURLs = await getDateURLs(context, serviceURL, params);
   expect(dateURLs.length, "No available appointment dates").toBeGreaterThan(0);
 
-  const appointmentURLs = getAppointmentURLs(context, dateURLs);
+  const appointmentURLs = await getAppointmentURLs(context, dateURLs, params);
   expect(
     appointmentURLs.length,
     "No available appointments on any appointment date"
@@ -52,9 +42,7 @@ test("appointment", async ({ context }) => {
 
   for (const appointmentURL of appointmentURLs) {
     try {
-      logger.info(`Booking appointment at ${appointmentURL}`);
-      await bookAppointment(context, appointmentURL);
-      logger.info("Booking successful!");
+      await bookAppointment(context, appointmentURL, params, testInfo);
       return;
     } catch (e) {
       logger.error(
@@ -69,21 +57,19 @@ function timestamp() {
   return new Date(Date.now()).toUTCString();
 }
 
-async function getServiceURL(context) {
+async function getServiceURL(context, params) {
   return await test.step("get service url", async () => {
     const page = await context.newPage();
     const servicesURL = "https://service.berlin.de/dienstleistungen/";
     await page.goto(servicesURL, { waitUntil: "domcontentloaded" });
     await checkRateLimitExceeded(page);
     await checkCaptcha(page);
-    const appointmentService =
-      process.env.APPT_SERVICE || "Anmeldung einer Wohnung";
     const serviceLinkLocator = page.getByRole("link", {
-      name: appointmentService,
+      name: params.APPOINTMENT_SERVICE,
     });
     await expect(
       serviceLinkLocator,
-      `Service ${appointmentService} not found at ${servicesURL}`
+      `Service ${params.APPOINTMENT_SERVICE} not found at ${servicesURL}`
     ).toBeVisible();
     const serviceUrl = await serviceLinkLocator.getAttribute("href");
     await page.close();
@@ -91,19 +77,21 @@ async function getServiceURL(context) {
   });
 }
 
-async function getDateURLs(context, serviceURL) {
+async function getDateURLs(context, serviceURL, params) {
   return await test.step("get date urls", async () => {
     const page = await context.newPage();
     await page.goto(serviceURL, { waitUntil: "domcontentloaded" });
     await checkRateLimitExceeded(page);
     await checkCaptcha(page);
-    const appointmentLocations = process.env.APPT_LOCATIONS
-      ? process.env.APPT_LOCATIONS.split(",")
-      : [];
-    await selectLocations(page, {
-      locations: appointmentLocations,
-    });
-    logger.info("Navigating to the appointment calendar");
+    await selectLocations(
+      page,
+      {
+        locations: params.APPOINTMENT_LOCATIONS
+          ? params.APPOINTMENT_LOCATIONS.split(",")
+          : [],
+      },
+      logger
+    );
     await Promise.all([
       page.waitForNavigation({ waitUntil: "domcontentloaded" }),
       page
@@ -131,16 +119,12 @@ async function getDateURLs(context, serviceURL) {
     ]);
     const dateURLsPage2 = await scrapeDateURLs(page);
     const dateURLs = [...new Set(dateURLsPage1.concat(dateURLsPage2))];
-    logger.info(`Found ${dateURLs.length} appointment dates.`);
-    const appointmentEarliestDate =
-      process.env.APPT_EARLIEST_DATE || "1970-01-01 GMT";
-    const appointmentLatestDate =
-      process.env.APPT_LATEST_DATE || "2069-12-31 GMT";
+    logger.debug(`Found ${dateURLs.length} appointment dates.`);
     const filteredDateURLs = filterURLsBetweenDates(dateURLs, {
-      earliestDate: appointmentEarliestDate,
-      latestDate: appointmentLatestDate,
+      earliestDate: params.APPOINTMENT_EARLIEST_DATE,
+      latestDate: params.APPOINTMENT_LATEST_DATE,
     });
-    logger.info(
+    logger.debug(
       `Found ${filteredDateURLs.length} appointment dates within the configured date range.`
     );
     await page.close();
@@ -159,7 +143,7 @@ async function selectLocations(page, { locations }) {
         els.map((el) => (el.checked = true))
       );
     } else {
-      // TODO: First location in process.env.APPT_LOCATIONS must always exist or this will fail.
+      // TODO: First location in params.APPOINTMENT_LOCATIONS must always exist or this will fail.
       await page
         .getByRole("checkbox", { name: locations[0], exact: true })
         .check();
@@ -177,39 +161,42 @@ async function selectLocations(page, { locations }) {
   });
 }
 
-async function getAppointmentURLs(context, dateURLs) {
+async function getAppointmentURLs(context, dateURLs, params) {
   return await test.step("get appointment urls", async () => {
     return await [].concat.apply(
       [],
       await Promise.map(
         dateURLs,
         async (url) =>
-          getAppointmentURLsForDateURL(await context.newPage(), url).catch(
-            (e) => {
-              // If one URL fails, just return [] and go ahead with the URLs you could find.
-              logger.error(`Get appointments failed for ${url} - ${e.message}`);
-              return [];
-            }
-          ),
-        { concurrency: parseInt(process.env.CONCURRENCY || "3") }
+          getAppointmentURLsForDateURL(
+            await context.newPage(),
+            url,
+            params,
+            logger
+          ).catch((e) => {
+            // If one URL fails, just return [] and go ahead with the URLs you could find.
+            logger.error(`Get appointments failed for ${url} - ${e.message}`);
+            return [];
+          }),
+        { concurrency: parseInt(process.env.CONCURRENCY || "16")}
       )
     );
   });
 }
 
-async function getAppointmentURLsForDateURL(page, url) {
+async function getAppointmentURLsForDateURL(page, url, params) {
   return await test.step(`get appointment urls for ${url}`, async () => {
-    logger.info(`Getting appointments for ${url}`);
+    logger.debug(`Getting appointments for ${url}`);
     await page.goto(url, { waitUntil: "domcontentloaded" });
     await checkRateLimitExceeded(page);
     await checkCaptcha(page);
     const urls = await scrapeAppointmentURLs(page);
-    logger.info(`Found ${urls.length} appointments for ${url}`);
+    logger.debug(`Found ${urls.length} appointments for ${url}`);
     const filteredURLs = filterURLsBetweenTimes(urls, {
-      earliestTime: process.env.APPT_EARLIEST_TIME || "00:00 GMT",
-      latestTime: process.env.APPT_LATEST_TIME || "23:59 GMT",
+      earliestTime: params.APPOINTMENT_EARLIEST_TIME,
+      latestTime: params.APPOINTMENT_LATEST_TIME,
     });
-    logger.info(
+    logger.debug(
       `Found ${filteredURLs.length} appointments within the configured time range for ${url}`
     );
     await page.close();
@@ -217,9 +204,9 @@ async function getAppointmentURLsForDateURL(page, url) {
   });
 }
 
-async function bookAppointment(context, url) {
+async function bookAppointment(context, url, params, testInfo) {
   await test.step(`book appointment at ${url}`, async () => {
-    logger.info(`Retrieving booking page for ${url}`);
+    logger.debug(`Retrieving booking page for ${url}`);
     const page = await context.newPage();
     await page.goto(url, { waitUntil: "domcontentloaded" });
     await checkRateLimitExceeded(page);
@@ -229,7 +216,7 @@ async function bookAppointment(context, url) {
       name: "Reservierung aufheben und neue Terminsuche starten",
     });
     if (await startNewReservation.isVisible()) {
-      logger.info("Starting a new reservation process.");
+      logger.debug("Starting a new reservation process.");
       await Promise.all([
         page.waitForNavigation({ waitUntil: "domcontentloaded" }),
         startNewReservation.click(),
@@ -247,17 +234,17 @@ async function bookAppointment(context, url) {
     }
 
     // Set up MailSlurp inbox
-    const mailslurp = new MailSlurp({ apiKey: process.env.MAILSLURP_API_KEY });
-    let inboxId = process.env.MAILSLURP_INBOX_ID;
+    const mailslurp = new MailSlurp({ apiKey: params.MAILSLURP_API_KEY });
+    let inboxId = params.MAILSLURP_INBOX_ID;
     if (!inboxId) {
       ({ id: inboxId } = await mailslurp.createInbox());
-      logger.info(`Created MailSlurp inbox with id: ${inboxId}`);
+      logger.debug(`Created MailSlurp inbox with id: ${inboxId}`);
     }
     const inbox = await mailslurp.getInbox(inboxId);
 
-    logger.info(`Filling booking form for ${url}`);
-    const name = process.env.FORM_NAME || "Max Mustermann";
-    const takeSurvey = process.env.FORM_TAKE_SURVEY || "false";
+    logger.debug(`Filling booking form for ${url}`);
+    const name = params.FORM_NAME;
+    const takeSurvey = params.FORM_TAKE_SURVEY;
     await Promise.all([
       page
         .locator("input#familyName")
@@ -275,9 +262,9 @@ async function bookAppointment(context, url) {
     ]);
 
     // The note feature is not available for every location.
-    const note = process.env.FORM_NOTE || "";
+    const note = params.FORM_NOTE;
     if (note) {
-      logger.info(
+      logger.debug(
         "Writing the configured note if the feature is available ..."
       );
       const noteInput = page.locator("textarea[name=amendment]");
@@ -293,9 +280,9 @@ async function bookAppointment(context, url) {
     }
 
     // Telephone entry is not available for every location.
-    const phone = process.env.FORM_PHONE || "0176 55555555";
+    const phone = params.FORM_PHONE;
     if (phone) {
-      logger.info(
+      logger.debug(
         "Writing the configured phone number if the feature is available ..."
       );
       const phoneInput = page.locator("input#telephone");
@@ -327,20 +314,20 @@ async function bookAppointment(context, url) {
     });
 
     // Wait for first email (confirmation or verification code) to arrive.
-    logger.info(
+    logger.debug(
       `Waiting for email verification code to arrive at inbox with id ${inboxId} ...`
     );
-    const firstEmail = await mailslurp.waitForLatestEmail({
+    const firstEmail = await mailslurp.waitForLatestEmail(
       inboxId,
-      timeout: 300_000,
-      unreadOnly: true,
-    });
+      300_000,
+      true
+    );
 
     let verificationCode;
     if (/verifizieren/.exec(firstEmail.subject)) {
       verificationCode = /<h2>([0-9a-zA-Z]{6})<\/h2>/.exec(firstEmail.body)[1];
     } else {
-      logger.info("No email verification code was requested");
+      logger.debug("No email verification code was requested");
     }
 
     // TODO: Validate the booking confirmation (or verification code page)
@@ -357,82 +344,66 @@ async function bookAppointment(context, url) {
     if (verificationCode) {
       const verificationCodeInput = page.locator("input#verificationcode");
       if (await verificationCodeInput.isVisible()) {
-        logger.info(`Filling in verification code: ${verificationCode}`);
+        logger.debug(`Filling in verification code: ${verificationCode}`);
         await verificationCodeInput.fill(verificationCode);
         await submitVerificationCode().catch(async () => {
           await submitVerificationCode();
         });
-        logger.info("Waiting for email confirmation to arrive ...");
-        secondEmail = await mailslurp.waitForLatestEmail({
+        logger.debug("Waiting for email confirmation to arrive ...");
+        secondEmail = await mailslurp.waitForLatestEmail(
           inboxId,
-          timeout: 300_000,
-          unreadOnly: true,
-        });
+          300_000,
+          true
+        );
       }
     }
 
     async function saveCalendarAttachment(email, suffix) {
-      // check has one attachment
       expect(email.attachments.length).toEqual(1);
       const attachmentDto =
         await mailslurp.emailController.downloadAttachmentBase64({
           attachmentId: email.attachments[0],
           emailId: email.id,
         });
-      // can access content
       expect(attachmentDto.base64FileContents).toBeTruthy();
       const fileContent = new Buffer(
         attachmentDto.base64FileContents,
         "base64"
       ).toString();
-      const outputFilename = `./output/appointment-${suffix}.ics`;
-      await fs.writeFile(outputFilename, fileContent);
-      logger.info(`Saved calendar attachment to ${outputFilename}`);
+      await testInfo.attach(`appointment-${suffix}.ics`, { body: fileContent });
     }
 
-    function saveConfirmationPage(suffix) {
-      return page
-        .screenshot({
-          // TODO: Write these to test-results
-          path: `./output/web-confirmation-${suffix}.png`,
-          fullPage: true,
-        })
-        .catch((e) => {
-          logger.error(
-            `Failed to save screenshot of booking confirmation - ${e.message}`
-          );
-          logger.info(
-            `Check your MailSlurp inbox for booking info: ${e.message}`
-          );
-        });
+    async function saveConfirmationPage(suffix) {
+      const screenshot = await page.screenshot({ fullPage: true });
+      return testInfo.attach(`web-confirmation-${suffix}`, {
+        body: screenshot,
+        contentType: "image/png",
+      });
     }
 
     const savedAt = timestamp();
-    logger.info(`Saving booking files for booking at ${savedAt} ...`);
+    logger.debug(`Saving booking files for booking at ${savedAt} ...`);
     if (secondEmail) {
       await Promise.allSettled([
         saveCalendarAttachment(secondEmail, savedAt),
         saveConfirmationPage(savedAt),
-        // TODO: Write these to test-results
-        fs.writeFile(
-          `./output/email-verification-${savedAt}.html`,
-          firstEmail.body
-        ),
-        // TODO: Write these to test-results
-        fs.writeFile(
-          `./output/email-confirmation-${savedAt}.html`,
-          secondEmail.body
-        ),
+        testInfo.attach(`email-verification-${savedAt}`, {
+          body: firstEmail.body,
+          contentType: "text/html",
+        }),
+        testInfo.attach(`email-confirmation-${savedAt}`, {
+          body: secondEmail.body,
+          contentType: "text/html",
+        }),
       ]);
     } else if (firstEmail) {
       await Promise.allSettled([
         saveCalendarAttachment(firstEmail, savedAt),
         saveConfirmationPage(savedAt),
-        // TODO: Write these to test-results
-        fs.writeFile(
-          `./output/email-confirmation-${savedAt}.html`,
-          firstEmail.body
-        ),
+        testInfo.attach(`email-confirmation-${savedAt}`, {
+          body: firstEmail.body,
+          contentType: "text/html",
+        }),
       ]);
     }
     await page.close();
@@ -473,13 +444,9 @@ function filterURLsBetweenTimes(urls, { earliestTime, latestTime }) {
   });
 }
 
-function sleep(ms = 120000) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
 function checkRateLimitExceeded(page) {
   return expect(
-    page.getByText("Zu viele Zugriffe"),
+    page.getByRole("heading", { name: "Zu viele Zugriffe" }),
     "Rate limit exceeded"
   ).not.toBeVisible({ timeout: 1 });
 }
