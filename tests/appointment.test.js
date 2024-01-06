@@ -17,17 +17,6 @@ const test = require("../src/test.js")({
   APPOINTMENT_LATEST_TIME: "23:59 GMT",
 });
 
-test.beforeEach(async ({ context }) => {
-  await context.addInitScript({ path: "stealth.min.js" });
-});
-
-test.afterEach(async ({ context }, testInfo) => {
-  await context.close();
-  if (testInfo.status !== testInfo.expectedStatus) {
-    logger.warn(`Appointment booking failed: ${testInfo.error.message}`);
-  }
-});
-
 test("appointment", async ({ context, params }, testInfo) => {
   logger.debug(JSON.stringify(params, null, 2));
   const serviceURL = await getServiceURL(context, params);
@@ -178,7 +167,7 @@ async function getAppointmentURLs(context, dateURLs, params) {
             logger.error(`Get appointments failed for ${url} - ${e.message}`);
             return [];
           }),
-        { concurrency: parseInt(process.env.CONCURRENCY || "16")}
+        { concurrency: parseInt(process.env.CONCURRENCY || "16") }
       )
     );
   });
