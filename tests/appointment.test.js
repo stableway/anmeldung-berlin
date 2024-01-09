@@ -240,10 +240,10 @@ async function bookAppointment(context, url, params, testInfo) {
         .evaluate((el, name) => (el.value = name), name),
       page
         .locator("input#email")
-        .evaluate((el, email) => (el.value = email), inbox.emailAddress),
+        .evaluate((el, email) => (el.value = email.trim()), inbox.emailAddress),
       page
         .locator("input#emailequality")
-        .evaluate((el, email) => (el.value = email), inbox.emailAddress),
+        .evaluate((el, email) => (el.value = email.trim()), inbox.emailAddress),
       page
         .locator('select[name="surveyAccepted"]')
         .selectOption(takeSurvey === "true" ? "1" : "0"),
@@ -311,7 +311,6 @@ async function bookAppointment(context, url, params, testInfo) {
       300_000,
       true
     );
-
     let verificationCode;
     if (/verifizieren/.exec(firstEmail.subject)) {
       verificationCode = /<h2>([0-9a-zA-Z]{6})<\/h2>/.exec(firstEmail.body)[1];
