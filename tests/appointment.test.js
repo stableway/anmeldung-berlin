@@ -19,11 +19,20 @@ const test = require("../src/test.js")({
 
 test("appointment", async ({ context, params }, testInfo) => {
   logger.debug(JSON.stringify(params, null, 2));
-  const serviceURL = await getServiceURL(context, params);
-  const dateURLs = await getDateURLs(context, serviceURL, params);
+  const serviceURL = await getServiceURL(await context.newPage(), {
+    serviceName: params.APPOINTMENT_SERVICE,
+  });
+  const dateURLs = await getDateURLs(await context.newPage(), serviceURL, {
+    locations: params.APPOINTMENT_LOCATIONS,
+    earliestDate: params.APPOINTMENT_EARLIEST_DATE,
+    latestDate: params.APPOINTMENT_LATEST_DATE,
+  });
   expect(dateURLs.length, "No available appointment dates").toBeGreaterThan(0);
 
-  const appointmentURLs = await getAppointmentURLs(context, dateURLs, params);
+  const appointmentURLs = await getAppointmentURLs(context, dateURLs, {
+    earliestTime: params.APPOINTMENT_EARLIEST_TIME,
+    latestTime: params.APPOINTMENT_LATEST_TIME,
+  });
   expect(
     appointmentURLs.length,
     "No available appointments on any appointment date"
@@ -31,7 +40,19 @@ test("appointment", async ({ context, params }, testInfo) => {
 
   for (const appointmentURL of appointmentURLs) {
     try {
-      await bookAppointment(context, appointmentURL, params, testInfo);
+      await bookAppointment(
+        context,
+        appointmentURL,
+        {
+          mailSlurpAPIKey: params.MAILSLURP_API_KEY,
+          mailSlurpInboxId: params.MAILSLURP_INBOX_ID,
+          formName: params.FORM_NAME,
+          formTakeSurvey: params.FORM_TAKE_SURVEY,
+          formNote: params.FORM_NOTE,
+          formPhone: params.FORM_PHONE,
+        },
+        testInfo
+      );
       return;
     } catch (e) {
       logger.error(
@@ -46,77 +67,91 @@ function timestamp() {
   return new Date(Date.now()).toUTCString();
 }
 
-async function getServiceURL(context, params) {
-  return await test.step("get service url", async () => {
-    const page = await context.newPage();
-    const servicesURL = "https://service.berlin.de/dienstleistungen/";
-    await page.goto(servicesURL, { waitUntil: "domcontentloaded" });
-    await checkRateLimitExceeded(page);
-    await checkCaptcha(page);
-    const serviceLinkLocator = page.getByRole("link", {
-      name: params.APPOINTMENT_SERVICE,
+async function getServiceURL(page, { serviceName }) {
+  return await test
+    .step("get service url", async () => {
+      page.on("load", async () => {
+        await Promise.all([checkRateLimitExceeded(page), checkCaptcha(page)]);
+      });
+      const servicesURL = "https://service.berlin.de/dienstleistungen/";
+      await page.goto(servicesURL, { waitUntil: "domcontentloaded" });
+      const serviceLinkLocator = page.getByRole("link", {
+        name: serviceName,
+      });
+      await expect(
+        serviceLinkLocator,
+        `Service ${serviceName} not found at ${servicesURL}`
+      ).toBeVisible();
+      const serviceUrl = await serviceLinkLocator.getAttribute("href");
+      return serviceUrl;
+    })
+    .finally(async () => {
+      await page.close();
     });
-    await expect(
-      serviceLinkLocator,
-      `Service ${params.APPOINTMENT_SERVICE} not found at ${servicesURL}`
-    ).toBeVisible();
-    const serviceUrl = await serviceLinkLocator.getAttribute("href");
-    await page.close();
-    return serviceUrl;
-  });
 }
 
-async function getDateURLs(context, serviceURL, params) {
-  return await test.step("get date urls", async () => {
-    const page = await context.newPage();
-    await page.goto(serviceURL, { waitUntil: "domcontentloaded" });
-    await checkRateLimitExceeded(page);
-    await checkCaptcha(page);
-    await selectLocations(
-      page,
-      {
-        locations: params.APPOINTMENT_LOCATIONS
-          ? params.APPOINTMENT_LOCATIONS.split(",")
-          : [],
-      },
-      logger
-    );
-    await Promise.all([
-      page.waitForNavigation({ waitUntil: "domcontentloaded" }),
-      page
-        .getByRole("button", { name: "An diesem Standort einen Termin buchen" })
-        .click(),
-    ]);
-    await checkRateLimitExceeded(page);
-    await checkCaptcha(page);
-    await expect(
-      page,
-      "No appointments available for the selected locations"
-    ).not.toHaveURL(/service\.berlin\.de\/terminvereinbarung\/termin\/taken/, {
-      timeout: 1,
-    });
-    await expect(page.getByRole("heading", { name: "Wartung" }), "Website is down for maintenance").not.toBeVisible({timeout: 1});
+async function getDateURLs(
+  page,
+  serviceURL,
+  { locations, earliestDate, latestDate }
+) {
+  return await test
+    .step("get date urls", async () => {
+      page.on("load", async () => {
+        await Promise.all([checkRateLimitExceeded(page), checkCaptcha(page)]);
+      });
+      await page.goto(serviceURL, { waitUntil: "domcontentloaded" });
+      await selectLocations(page, {
+        locations: locations ? locations.split(",") : [],
+      });
+      await Promise.all([
+        page.waitForNavigation(),
+        page
+          .getByRole("button", {
+            name: "An diesem Standort einen Termin buchen",
+          })
+          .click(),
+      ]);
+      await expect(
+        page,
+        "No appointments available for the selected locations"
+      ).not.toHaveURL(
+        /service\.berlin\.de\/terminvereinbarung\/termin\/taken/,
+        {
+          timeout: 1,
+        }
+      );
+      await expect(
+        page.getByRole("heading", { name: "Wartung" }),
+        "Website is down for maintenance"
+      ).not.toBeVisible({ timeout: 1 });
 
-    logger.debug(`Calendar url: ${page.url()}`);
-    const dateURLsPage1 = await scrapeDateURLs(page);
-    // TODO: use page.getByRole for pagination button
-    await Promise.all([
-      page.waitForNavigation({ waitUntil: "domcontentloaded" }),
-      page.locator("th.next").click(),
-    ]);
-    const dateURLsPage2 = await scrapeDateURLs(page);
-    const dateURLs = [...new Set(dateURLsPage1.concat(dateURLsPage2))];
-    logger.debug(`Found ${dateURLs.length} appointment dates.`);
-    const filteredDateURLs = filterURLsBetweenDates(dateURLs, {
-      earliestDate: params.APPOINTMENT_EARLIEST_DATE,
-      latestDate: params.APPOINTMENT_LATEST_DATE,
+      logger.debug(`Calendar url: ${page.url()}`);
+      const dateURLsPage1 = await scrapeDateURLs(page);
+      // TODO: use page.getByRole for pagination button
+      let dateURLsPage2 = [];
+      const nextButtonLocator = page.locator("th.next");
+      if (await nextButtonLocator.isVisible()) {
+        await Promise.all([
+          page.waitForNavigation(),
+          page.locator("th.next").click(),
+        ]);
+        dateURLsPage2 = await scrapeDateURLs(page);
+      }
+      const dateURLs = [...new Set(dateURLsPage1.concat(dateURLsPage2))];
+      logger.debug(`Found ${dateURLs.length} appointment dates.`);
+      const filteredDateURLs = filterURLsBetweenDates(dateURLs, {
+        earliestDate,
+        latestDate,
+      });
+      logger.debug(
+        `Found ${filteredDateURLs.length} appointment dates within the configured date range.`
+      );
+      return filteredDateURLs;
+    })
+    .finally(async () => {
+      await page.close();
     });
-    logger.debug(
-      `Found ${filteredDateURLs.length} appointment dates within the configured date range.`
-    );
-    await page.close();
-    return filteredDateURLs;
-  });
 }
 
 async function selectLocations(page, { locations }) {
@@ -148,19 +183,21 @@ async function selectLocations(page, { locations }) {
   });
 }
 
-async function getAppointmentURLs(context, dateURLs, params) {
+async function getAppointmentURLs(
+  context,
+  dateURLs,
+  { earliestTime, latestTime }
+) {
   return await test.step("get appointment urls", async () => {
     return await [].concat.apply(
       [],
       await Promise.map(
         dateURLs,
         async (url) =>
-          getAppointmentURLsForDateURL(
-            await context.newPage(),
-            url,
-            params,
-            logger
-          ).catch((e) => {
+          getAppointmentURLsForDateURL(await context.newPage(), url, {
+            earliestTime,
+            latestTime,
+          }).catch((e) => {
             // If one URL fails, just return [] and go ahead with the URLs you could find.
             logger.error(`Get appointments failed for ${url} - ${e.message}`);
             return [];
@@ -171,33 +208,54 @@ async function getAppointmentURLs(context, dateURLs, params) {
   });
 }
 
-async function getAppointmentURLsForDateURL(page, url, params) {
-  return await test.step(`get appointment urls for ${url}`, async () => {
-    logger.debug(`Getting appointments for ${url}`);
-    await page.goto(url, { waitUntil: "domcontentloaded" });
-    await checkRateLimitExceeded(page);
-    await checkCaptcha(page);
-    const urls = await scrapeAppointmentURLs(page);
-    logger.debug(`Found ${urls.length} appointments for ${url}`);
-    const filteredURLs = filterURLsBetweenTimes(urls, {
-      earliestTime: params.APPOINTMENT_EARLIEST_TIME,
-      latestTime: params.APPOINTMENT_LATEST_TIME,
+async function getAppointmentURLsForDateURL(
+  page,
+  url,
+  { earliestTime, latestTime }
+) {
+  return await test
+    .step(`get appointment urls for ${url}`, async () => {
+      page.on("load", async () => {
+        await Promise.all([checkRateLimitExceeded(page), checkCaptcha(page)]);
+      });
+      logger.debug(`Getting appointments for ${url}`);
+      await page.goto(url, { waitUntil: "domcontentloaded" });
+      const urls = await scrapeAppointmentURLs(page);
+      logger.debug(`Found ${urls.length} appointments for ${url}`);
+      const filteredURLs = filterURLsBetweenTimes(urls, {
+        earliestTime,
+        latestTime,
+      });
+      logger.debug(
+        `Found ${filteredURLs.length} appointments within the configured time range for ${url}`
+      );
+      return filteredURLs;
+    })
+    .finally(async () => {
+      await page.close();
     });
-    logger.debug(
-      `Found ${filteredURLs.length} appointments within the configured time range for ${url}`
-    );
-    await page.close();
-    return filteredURLs;
-  });
 }
 
-async function bookAppointment(context, url, params, testInfo) {
+async function bookAppointment(
+  context,
+  url,
+  {
+    mailSlurpAPIKey,
+    mailSlurpInboxId,
+    formName,
+    formTakeSurvey,
+    formNote,
+    formPhone,
+  },
+  testInfo
+) {
   await test.step(`book appointment at ${url}`, async () => {
     logger.debug(`Retrieving booking page for ${url}`);
     const page = await context.newPage();
+    page.on("load", async () => {
+      await Promise.all([checkRateLimitExceeded(page), checkCaptcha(page)]);
+    });
     await page.goto(url, { waitUntil: "domcontentloaded" });
-    await checkRateLimitExceeded(page);
-    await checkCaptcha(page);
     // This block is executed if the first appointment link failed and more than 1 appointment link was found.
     const startNewReservation = page.getByRole("link", {
       name: "Reservierung aufheben und neue Terminsuche starten",
@@ -205,24 +263,24 @@ async function bookAppointment(context, url, params, testInfo) {
     if (await startNewReservation.isVisible()) {
       logger.debug("Starting a new reservation process.");
       await Promise.all([
-        page.waitForNavigation({ waitUntil: "domcontentloaded" }),
+        page.waitForNavigation(),
         startNewReservation.click(),
       ]);
-      await page.goto(url, { waitUntil: "domcontentloaded" });
-      await checkRateLimitExceeded(page);
-      await checkCaptcha(page);
+      await page.goto(url);
     }
+    await expect(
+      page.getByRole("heading", { name: "Bitte entschuldigen Sie den Fehler" }),
+      "Appointment already taken"
+    ).not.toBeVisible({ timeout: 1 });
 
-    const alreadyTaken = await page
-      .getByText("Bitte entschuldigen Sie den Fehler")
-      .isVisible();
-    if (alreadyTaken) {
-      throw new Error("Appointment already taken. Exiting.");
-    }
+    await expect(
+      page.getByRole("heading", { name: "Terminvereinbarung" }),
+      "Booking page not reached"
+    ).toBeVisible();
 
     // Set up MailSlurp inbox
-    const mailslurp = new MailSlurp({ apiKey: params.MAILSLURP_API_KEY });
-    let inboxId = params.MAILSLURP_INBOX_ID;
+    const mailslurp = new MailSlurp({ apiKey: mailSlurpAPIKey });
+    let inboxId = mailSlurpInboxId;
     if (!inboxId) {
       ({ id: inboxId } = await mailslurp.createInbox());
       logger.debug(`Created MailSlurp inbox with id: ${inboxId}`);
@@ -230,12 +288,10 @@ async function bookAppointment(context, url, params, testInfo) {
     const inbox = await mailslurp.getInbox(inboxId);
 
     logger.debug(`Filling booking form for ${url}`);
-    const name = params.FORM_NAME;
-    const takeSurvey = params.FORM_TAKE_SURVEY;
     await Promise.all([
       page
         .locator("input#familyName")
-        .evaluate((el, name) => (el.value = name), name),
+        .evaluate((el, name) => (el.value = name), formName),
       page
         .locator("input#email")
         .evaluate((el, email) => (el.value = email.trim()), inbox.emailAddress),
@@ -244,20 +300,19 @@ async function bookAppointment(context, url, params, testInfo) {
         .evaluate((el, email) => (el.value = email.trim()), inbox.emailAddress),
       page
         .locator('select[name="surveyAccepted"]')
-        .selectOption(takeSurvey === "true" ? "1" : "0"),
+        .selectOption(formTakeSurvey === "true" ? "1" : "0"),
       page.locator("input#agbgelesen").check(),
     ]);
 
     // The note feature is not available for every location.
-    const note = params.FORM_NOTE;
-    if (note) {
+    if (formNote) {
       logger.debug(
         "Writing the configured note if the feature is available ..."
       );
       const noteInput = page.locator("textarea[name=amendment]");
       if (await noteInput.isVisible()) {
         await noteInput
-          .evaluate((el, note) => (el.value = note), note)
+          .evaluate((el, note) => (el.value = note), formNote)
           .catch((e) =>
             logger.warn(
               `Write note failed. Continuing with booking with no note - ${e.message}`
@@ -267,15 +322,14 @@ async function bookAppointment(context, url, params, testInfo) {
     }
 
     // Telephone entry is not available for every location.
-    const phone = params.FORM_PHONE;
-    if (phone) {
+    if (formPhone) {
       logger.debug(
         "Writing the configured phone number if the feature is available ..."
       );
       const phoneInput = page.locator("input#telephone");
       if (await phoneInput.isVisible()) {
         await phoneInput
-          .evaluate((el, phone) => (el.value = phone), phone)
+          .evaluate((el, phone) => (el.value = phone), formPhone)
           .catch((e) => {
             logger.warn(
               `Failed to write phone number. Continuing with booking without providing a contact number - ${e.message}`
@@ -290,58 +344,61 @@ async function bookAppointment(context, url, params, testInfo) {
     await mailslurp.getEmails(inboxId, { unreadOnly: true });
 
     // Submit the appointment booking form.
-    function submitBooking() {
-      return Promise.all([
-        page.waitForNavigation({ waitUntil: "networkidle" }),
+    logger.debug("Submitting appointment booking form ...");
+    await expect(async () => {
+      await Promise.all([
+        page.waitForNavigation(),
         page.locator("button#register_submit.btn").click(),
       ]);
-    }
-    await submitBooking().catch(async () => {
-      await submitBooking();
-    });
+      await expect(
+        page.getByRole("heading", {
+          name: /Terminbuchung - Email bestätigen|Terminbestätigung/,
+        })
+      ).toBeVisible();
+    }, "Form submission failed").toPass();
 
     // Wait for first email (confirmation or verification code) to arrive.
     logger.debug(
-      `Waiting for email verification code to arrive at inbox with id ${inboxId} ...`
+      `Waiting for first email (verification or confirmation) to arrive at inbox with id ${inboxId} ...`
     );
+    // TODO: "fetch failed" error message sporadically occurs here.
     const firstEmail = await mailslurp.waitForLatestEmail(
       inboxId,
       300_000,
       true
     );
-    let verificationCode;
+
+    let verificationCode, secondEmail;
     if (/verifizieren/.exec(firstEmail.subject)) {
+      logger.debug("Email verification code requested");
       verificationCode = /<h2>([0-9a-zA-Z]{6})<\/h2>/.exec(firstEmail.body)[1];
-    } else {
-      logger.debug("No email verification code was requested");
-    }
+      logger.debug(`Verification code: ${verificationCode}`);
 
-    // TODO: Validate the booking confirmation (or verification code page)
-
-    // Function to click submit button
-    function submitVerificationCode() {
-      // <button class="btn" type="submit" name="submit" value="Termin verifzieren">Termin verifzieren</button>
-      return Promise.all([
-        page.waitForNavigation({ waitUntil: "networkidle" }),
-        page.getByRole("button", { name: "Termin verifzieren" }).click(),
-      ]);
-    }
-    let secondEmail;
-    if (verificationCode) {
       const verificationCodeInput = page.locator("input#verificationcode");
-      if (await verificationCodeInput.isVisible()) {
-        logger.debug(`Filling in verification code: ${verificationCode}`);
-        await verificationCodeInput.fill(verificationCode);
-        await submitVerificationCode().catch(async () => {
-          await submitVerificationCode();
-        });
-        logger.debug("Waiting for email confirmation to arrive ...");
-        secondEmail = await mailslurp.waitForLatestEmail(
-          inboxId,
-          300_000,
-          true
-        );
-      }
+      await expect(verificationCodeInput).toBeVisible();
+
+      // Fill & submit the verification code.
+      await verificationCodeInput.fill(verificationCode);
+      logger.debug("Submitting verification code ...");
+      await expect(async () => {
+        await Promise.all([
+          page.waitForNavigation(),
+          page.getByRole("button", { name: "Termin verifzieren" }).click(),
+        ]);
+        await expect(
+          page.getByRole("heading", { name: "Terminbestätigung" })
+        ).toBeVisible();
+      }, "Verification code submission failed").toPass();
+
+      logger.debug("Waiting for second email (confirmation) to arrive ...");
+      // TODO: "fetch failed" error message sporadically occurs here.
+      secondEmail = await mailslurp.waitForLatestEmail(inboxId, 300_000, true);
+    } else {
+      logger.debug("No email verification code requested");
+      await expect(
+        page.getByRole("heading", { name: "Terminbestätigung" }),
+        "Confirmation page not reached"
+      ).toBeVisible();
     }
 
     async function saveCalendarAttachment(email, suffix) {
@@ -396,8 +453,8 @@ async function bookAppointment(context, url, params, testInfo) {
   });
 }
 
-async function scrapeDateURLs(page) {
-  return await page
+function scrapeDateURLs(page) {
+  return page
     .locator("td.buchbar > a")
     .evaluateAll((els) => els.map((el) => el.href).filter((href) => !!href));
 }
@@ -413,8 +470,8 @@ function filterURLsBetweenDates(urls, { earliestDate, latestDate }) {
 
 async function scrapeAppointmentURLs(page) {
   const timetable = page.locator(".timetable");
-  if ((await timetable.isVisible()) === false) return [];
-  return await timetable
+  await expect(timetable, "No timetable found").toBeVisible();
+  return timetable
     .locator("td.frei > a")
     .evaluateAll((els) => els.map((el) => el.href).filter((href) => !!href));
 }
