@@ -95,10 +95,8 @@ async function getDateURLs(context, serviceURL, params) {
     ).not.toHaveURL(/service\.berlin\.de\/terminvereinbarung\/termin\/taken/, {
       timeout: 1,
     });
-    // TODO: Check for maintenance page "Wartung"
-    // if (page.getByRole("heading", { name: "Wartung" }).isVisible()) {
-    //   throw new Error("Site down for maintenance. Exiting.");
-    // }
+    await expect(page.getByRole("heading", { name: "Wartung" }), "Website is down for maintenance").not.toBeVisible({timeout: 1});
+
     logger.debug(`Calendar url: ${page.url()}`);
     const dateURLsPage1 = await scrapeDateURLs(page);
     // TODO: use page.getByRole for pagination button
