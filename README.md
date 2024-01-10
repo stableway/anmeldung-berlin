@@ -8,20 +8,16 @@ This app will find and book any [service.berlin.de](https://service.berlin.de) a
 
 Get a [MailSlurp API key here](https://app.mailslurp.com/sign-up/).
 
-### 2. Update Stealth Evasions
-
-```bash
-npx extract-stealth-evasions
-```
-
-### 3a. Run with Docker (recommended)
+### 2a. Run with Docker (recommended)
 
 Build & run Docker container.
 
 ```bash
+# Update stealth evasions
+npx extract-stealth-evasions
 # Build
 docker build -t anmeldung-berlin .
-# Get an appointment
+# Book an "Anmeldung einer Wohnung" appointment
 docker run \
     -v $(pwd)/playwright-report:/home/pwuser/playwright-report \
     -v $(pwd)/test-results:/home/pwuser/test-results \
@@ -29,20 +25,39 @@ docker run \
     -e FORM_NAME=*your-name* \
     -e FORM_PHONE=*your-phone-number* \
     anmeldung-berlin
+# Book an "Blaue Karte EU auf einen neuen Pass übertragen" appointment on/after 01 Feb 2024 & before/on 28 Feb 2024 at any time.
+docker run \
+    -v $(pwd)/playwright-report:/home/pwuser/playwright-report \
+    -v $(pwd)/test-results:/home/pwuser/test-results \
+    -e MAILSLURP_API_KEY=*your-api-key* \
+    -e FORM_NAME=*your-name* \
+    -e FORM_PHONE=*your-phone-number* \
+    -e APPOINTMENT_SERVICE="Blaue Karte EU auf einen neuen Pass übertragen" \
+    -e APPOINTMENT_EARLIEST_DATE="2024-02-01 GMT" \
+    -e APPOINTMENT_LATEST_DATE="2024-02-28 GMT" \
+    anmeldung-berlin
 ```
 
-### 3b. Run Locally on Mac OS
+### 2b. Run Locally on Mac OS
 
 Run the program from the command line.
 
 ```bash
+# Update stealth evasions
+npx extract-stealth-evasions
 # Install dependencies
 npm i
 # Install browsers
 npx playwright install chromium
-# Get an appointment
+# Book an "Anmeldung einer Wohnung" appointment
 MAILSLURP_API_KEY=*your-api-key* FORM_NAME=*your-name* FORM_PHONE=*your-phone-number* \
     npm start
+# Book an "Abmeldung einer Wohnung" appointment starting on/after 10:00 AM and before/at 1:00 PM on any date.
+MAILSLURP_API_KEY=*your-api-key* FORM_NAME=*your-name* FORM_PHONE=*your-phone-number* \
+    APPOINTMENT_SERVICE="Abmeldung einer Wohnung" \
+    APPOINTMENT_EARLIEST_TIME="10:00 GMT" \
+    APPOINTMENT_LATEST_TIME="13:00 GMT" \
+    npm run debug
 ```
 
 ## Deployment
@@ -51,13 +66,9 @@ Set [playwright.config.js](/playwright.config.js) `retries` to a high number, if
 
 ## Parameters
 
-The app is parameterized via environment variables, which have default values (sometimes `null`) per Playwright Test instance.
+The app is parameterized via environment variables at runtime, which have default values (sometimes `null`) defined in the [Playwright test](./tests/appointment.test.js)
 
-```bash
-vi .env
-```
-
-For [making an appointmen](/tests/appointment.test.js), the parameters are:
+For [making an appointment](/tests/appointment.test.js), the parameters are:
 
 Environment Variable | Parameter Default | Description
 ---------|----------|---------
@@ -99,7 +110,6 @@ npx playwright show-report
 
 ## Known Issues
 
-- We don't verify the final booking page. Always check your emails and Playwright report for errors.
 - We can be blocked by a Captcha in some cases.
 
 ## Contributing
