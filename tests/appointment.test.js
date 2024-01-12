@@ -125,6 +125,12 @@ async function getDateURLs(
         page.getByRole("heading", { name: "Wartung" }),
         "Website is down for maintenance"
       ).not.toBeVisible({ timeout: 1 });
+      await expect(
+        page.getByRole("heading", {
+          name: "Die Terminvereinbarung ist zur Zeit nicht",
+        }),
+        "Appointment booking not possible at this time"
+      ).not.toBeVisible({ timeout: 1 });
 
       logger.debug(`Calendar url: ${page.url()}`);
       const dateURLsPage1 = await scrapeDateURLs(page);
