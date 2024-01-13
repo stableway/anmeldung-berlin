@@ -77,6 +77,7 @@ async function getServiceURL(page, { serviceName }) {
       await page.goto(servicesURL, { waitUntil: "domcontentloaded" });
       const serviceLinkLocator = page.getByRole("link", {
         name: serviceName,
+        exact: true,
       });
       await expect(
         serviceLinkLocator,
