@@ -57,12 +57,18 @@ MAILSLURP_API_KEY=*your-api-key* FORM_NAME=*your-name* FORM_PHONE=*your-phone-nu
     APPOINTMENT_SERVICE="Abmeldung einer Wohnung" \
     APPOINTMENT_EARLIEST_TIME="10:00 GMT" \
     APPOINTMENT_LATEST_TIME="13:00 GMT" \
-    npm run debug
+    npm start
 ```
 
 ## Deployment
 
-Set [playwright.config.js](/playwright.config.js) `retries` to a high number, if you want to run the app locally until a successful booking is made. You may very well be blocked for exceeding a rate limit. In this case, try setting `PROXY_URL` to a back-connect proxy URL.
+### Local
+
+Set [playwright.config.js](/playwright.config.js) `retries` to a high number (or run `npx playwright test --retries=*a high number* ...` from the CLI), if you want to run the app until a successful booking is made.
+
+To increase your chances of getting an appointment, set `PROXY_URL` to a back-connect proxy URL.
+
+If you don't have access to a back-connect proxy service, then I suggest setting environment variable `RETRY_WAIT_SECONDS` >= `90` to avoid exceeding the rate-limit and having to wait for `RETRY_WAIT_SECONDS_BLOCKED` to retry.
 
 ## Parameters
 
@@ -92,6 +98,8 @@ Variable | Default | Description
 `LOGLEVEL` | "info" | Set to "debug" to get stdout.
 `CONCURRENCY` | "16" | Max number of concurrent Pages.
 `PROXY_URL` | `undefined` | Hide your IP with a back-connect proxy.
+`RETRY_WAIT_SECONDS` | "0" | How long to wait between retries.
+`RETRY_WAIT_SECONDS_BLOCKED` | "600" | How long to wait when rate-limited.
 
 ## Debugging
 
