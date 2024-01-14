@@ -45,7 +45,7 @@ test("appointment", async ({ context, params }, testInfo) => {
     });
     return;
   } else {
-    const dateURLs = await getDateURLs(await context.newPage(), serviceURL, {
+    const dateURLs = await getDateURLs(servicePage, {
       locations: params.APPOINTMENT_LOCATIONS,
       earliestDate: params.APPOINTMENT_EARLIEST_DATE,
       latestDate: params.APPOINTMENT_LATEST_DATE,
