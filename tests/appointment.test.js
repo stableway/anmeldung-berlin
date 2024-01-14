@@ -2,6 +2,7 @@ const { expect } = require("@playwright/test");
 const MailSlurp = require("mailslurp-client").default;
 const Promise = require("bluebird");
 const logger = require("../src/logger");
+const { timeout } = require("../playwright.config.js");
 const test = require("../src/test.js")({
   MAILSLURP_API_KEY: null,
   MAILSLURP_INBOX_ID: null,
@@ -22,42 +23,62 @@ test("appointment", async ({ context, params }, testInfo) => {
   const serviceURL = await getServiceURL(await context.newPage(), {
     serviceName: params.APPOINTMENT_SERVICE,
   });
-  const dateURLs = await getDateURLs(await context.newPage(), serviceURL, {
-    locations: params.APPOINTMENT_LOCATIONS,
-    earliestDate: params.APPOINTMENT_EARLIEST_DATE,
-    latestDate: params.APPOINTMENT_LATEST_DATE,
+  const servicePage = await getServicePage(page, serviceURL);
+  const otvBookingLinkLocator = servicePage.getByRole("link", {
+    name: "Termin buchen",
   });
-  expect(dateURLs.length, "No available appointment dates").toBeGreaterThan(0);
+  if (await otvBookingLinkLocator.isVisible()) {
+    await otvAppointment(servicePage, {
+      nationality: params.OTV_NATIONALITY,
+      numberOfPeople: params.OTV_NUMBER_OF_PEOPLE,
+      withFamily: params.OTV_LIVE_WITH_FAMILY,
+      serviceName: params.OTV_SERVICE,
+      familyNationality: params.OTV_NATIONALITY_OF_FAMILY,
+      residenceReasonType: params.OTV_REASON_TYPE,
+      residenceReason: params.OTV_REASON,
+      lastName: params.OTV_LAST_NAME,
+    });
+    return;
+  } else {
+    const dateURLs = await getDateURLs(await context.newPage(), serviceURL, {
+      locations: params.APPOINTMENT_LOCATIONS,
+      earliestDate: params.APPOINTMENT_EARLIEST_DATE,
+      latestDate: params.APPOINTMENT_LATEST_DATE,
+    });
+    expect(dateURLs.length, "No available appointment dates").toBeGreaterThan(
+      0
+    );
 
-  const appointmentURLs = await getAppointmentURLs(context, dateURLs, {
-    earliestTime: params.APPOINTMENT_EARLIEST_TIME,
-    latestTime: params.APPOINTMENT_LATEST_TIME,
-  });
-  expect(
-    appointmentURLs.length,
-    "No available appointments on any appointment date"
-  ).toBeGreaterThan(0);
+    const appointmentURLs = await getAppointmentURLs(context, dateURLs, {
+      earliestTime: params.APPOINTMENT_EARLIEST_TIME,
+      latestTime: params.APPOINTMENT_LATEST_TIME,
+    });
+    expect(
+      appointmentURLs.length,
+      "No available appointments on any appointment date"
+    ).toBeGreaterThan(0);
 
-  for (const appointmentURL of appointmentURLs) {
-    try {
-      await bookAppointment(
-        context,
-        appointmentURL,
-        {
-          mailSlurpAPIKey: params.MAILSLURP_API_KEY,
-          mailSlurpInboxId: params.MAILSLURP_INBOX_ID,
-          formName: params.FORM_NAME,
-          formTakeSurvey: params.FORM_TAKE_SURVEY,
-          formNote: params.FORM_NOTE,
-          formPhone: params.FORM_PHONE,
-        },
-        testInfo
-      );
-      return;
-    } catch (e) {
-      logger.error(
-        `Booking appointment failed at ${appointmentURL}: ${e.message}`
-      );
+    for (const appointmentURL of appointmentURLs) {
+      try {
+        await bookAppointment(
+          context,
+          appointmentURL,
+          {
+            mailSlurpAPIKey: params.MAILSLURP_API_KEY,
+            mailSlurpInboxId: params.MAILSLURP_INBOX_ID,
+            formName: params.FORM_NAME,
+            formTakeSurvey: params.FORM_TAKE_SURVEY,
+            formNote: params.FORM_NOTE,
+            formPhone: params.FORM_PHONE,
+          },
+          testInfo
+        );
+        return;
+      } catch (e) {
+        logger.error(
+          `Booking appointment failed at ${appointmentURL}: ${e.message}`
+        );
+      }
     }
   }
   throw new Error("Booking failed for all appointments.");
@@ -91,17 +112,22 @@ async function getServiceURL(page, { serviceName }) {
     });
 }
 
-async function getDateURLs(
-  page,
-  serviceURL,
-  { locations, earliestDate, latestDate }
-) {
+async function getServicePage(page, url) {
+  return await test.step("get service page", async () => {
+    page.on("load", async () => {
+      await Promise.all([checkRateLimitExceeded(page), checkCaptcha(page)]);
+    });
+    await page.goto(url);
+    return page;
+  });
+}
+
+async function getDateURLs(page, { locations, earliestDate, latestDate }) {
   return await test
     .step("get date urls", async () => {
       page.on("load", async () => {
         await Promise.all([checkRateLimitExceeded(page), checkCaptcha(page)]);
       });
-      await page.goto(serviceURL, { waitUntil: "domcontentloaded" });
       await selectLocations(page, {
         locations: locations ? locations.split(",") : [],
       });
@@ -506,4 +532,69 @@ function checkCaptcha(page) {
     page.getByRole("heading", { name: "Bitte verifizieren sie sich" }),
     "Blocked by captcha"
   ).not.toBeVisible({ timeout: 1 });
+}
+
+async function otvAppointment(
+  page,
+  {
+    nationality,
+    numberOfPeople = "1",
+    withFamily = false,
+    serviceName = "Aufenthaltstitel - beantragen",
+    familyNationality = null,
+    residenceReasonType = "Erwerbstätigkeit",
+    residenceReason = "selbstständigen Tätigkeit - Erteilung",
+    lastName = null,
+  }
+) {
+  return test.step("otv appointment", async () => {
+    page.on("load", async (page) => {
+      await Promise.all([
+        expect(page, "Unexpectedly logged out").not.toHaveURL("**/logout", {
+          timeout: 1,
+        }),
+        expect(
+          page.getByRole("heading", { name: "Sitzungsende" }),
+          "Unexpectedly logged out"
+        ).not.toBeVisible({ timeout: 1 }),
+        checkCaptcha(page),
+        checkRateLimitExceeded(page),
+        expect(
+          page.getByText("aktuell keine Termine frei"),
+          "No appointments currently available"
+        ).not.toBeVisible({ timeout: 1 }),
+      ]);
+    });
+    await page.getByRole("link", { name: "Termin buchen" }).click();
+    await page.waitForURL("**/otv.verwalt-berlin.de/**");
+    await page.getByRole("link", { name: "Termin buchen" }).click();
+    await page.getByRole("checkbox").check();
+    await page.getByRole("button", { name: "Weiter" }).click();
+    await page.getByLabel("Staatsangehörigkeit").selectOption(nationality);
+    await page.getByLabel("Anzahl der Personen").selectOption(numberOfPeople);
+    await page
+      .getByLabel("mit einem Familienangehörigen")
+      .selectOption(withFamily ? "1" : "2");
+    if (withFamily) {
+      await page
+        .getByLabel("Staatsangehörigkeit des Familienangehörigen")
+        .selectOption(familyNationality);
+    }
+    await page.getByLabel(serviceName).check();
+    if (
+      serviceName === "Aufenthaltstitel - beantragen" ||
+      serviceName === "Aufenthaltstitel - verlängern"
+    ) {
+      await page.getByLabel(residenceReasonType).check();
+    }
+    await page.getByLabel(residenceReason).check();
+    if (
+      residenceReason === "Aufenthaltsgestattung - verlängern" ||
+      residenceReason === "Duldung - verlängern"
+    ) {
+      await page.getByLabel("Nachnamen").fill(lastName);
+    }
+    await page.getByRole("button", { name: "Weiter" }).click();
+    // TODO: If we actually get a calendar, book the appointment lol
+  });
 }
