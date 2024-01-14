@@ -15,6 +15,12 @@ const test = require("../src/test.js")({
   APPOINTMENT_LATEST_DATE: "2069-12-31 GMT",
   APPOINTMENT_EARLIEST_TIME: "00:00 GMT",
   APPOINTMENT_LATEST_TIME: "23:59 GMT",
+  OTV_SERVICE: "Aufenthaltstitel - beantragen",
+  OTV_NUMBER_OF_PEOPLE: "1",
+  OTV_LIVE_WITH_FAMILY: "false",
+  OTV_NATIONALITY: null,
+  OTV_NATIONALITY_OF_FAMILY: null,
+  OTV_LAST_NAME: null,
 });
 
 test("appointment", async ({ context, params }, testInfo) => {
@@ -538,7 +544,7 @@ async function otvAppointment(
   {
     nationality,
     numberOfPeople = "1",
-    withFamily = false,
+    withFamily = "false",
     serviceName = "Aufenthaltstitel - beantragen",
     familyNationality = null,
     residenceReasonType = "Erwerbstätigkeit",
@@ -573,7 +579,7 @@ async function otvAppointment(
     await page.getByLabel("Anzahl der Personen").selectOption(numberOfPeople);
     await page
       .getByLabel("mit einem Familienangehörigen")
-      .selectOption(withFamily ? "1" : "2");
+      .selectOption(withFamily === "true" ? "1" : "2");
     if (withFamily) {
       await page
         .getByLabel("Staatsangehörigkeit des Familienangehörigen")
