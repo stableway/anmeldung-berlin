@@ -2,7 +2,6 @@ const { expect } = require("@playwright/test");
 const MailSlurp = require("mailslurp-client").default;
 const Promise = require("bluebird");
 const logger = require("../src/logger");
-const { timeout } = require("../playwright.config.js");
 const test = require("../src/test.js")({
   MAILSLURP_API_KEY: null,
   MAILSLURP_INBOX_ID: null,
