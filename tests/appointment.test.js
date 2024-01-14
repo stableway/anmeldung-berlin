@@ -28,7 +28,7 @@ test("appointment", async ({ context, params }, testInfo) => {
   const serviceURL = await getServiceURL(await context.newPage(), {
     serviceName: params.APPOINTMENT_SERVICE,
   });
-  const servicePage = await getServicePage(page, serviceURL);
+  const servicePage = await getServicePage(await context.newPage(), serviceURL);
   const otvBookingLinkLocator = servicePage.getByRole("link", {
     name: "Termin buchen",
   });
