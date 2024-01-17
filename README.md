@@ -118,6 +118,6 @@ If you're planning to contribute to the project, install dev dependencies and us
 
 ```bash
 npm i --include=dev
-npx eslint --fix tests/ src/
-npx prettier -w tests/ src/
+npx eslint --fix tests/ src/ playwright.config.js
+npx prettier -w tests/ src/ playwright.config.js
 ```

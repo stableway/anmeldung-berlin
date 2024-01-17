@@ -1,19 +1,21 @@
-const { defineConfig, devices } = require('@playwright/test');
+const { defineConfig, devices } = require("@playwright/test");
 
 module.exports = defineConfig({
   name: "anmeldung-berlin",
-  testDir: './tests/',
+  testDir: "./tests/",
   timeout: 0,
-  reporter: [['html', { open: 'never' }]],
+  reporter: [["html", { open: "never" }]],
   use: {
-    ...devices['Desktop Chrome'],
+    ...devices["Desktop Chrome"],
     channel: "chrome",
     ignoreHTTPSErrors: true,
     bypassCSP: true,
     launchOptions: {
       args: ["--no-sandbox", "--disable-setuid-sandbox"],
     },
-    proxy: process.env.PROXY_URL ? { server: process.env.PROXY_URL } : undefined,
+    proxy: process.env.PROXY_URL
+      ? { server: process.env.PROXY_URL }
+      : undefined,
     actionTimeout: 10 * 1000,
     navigationTimeout: 60 * 1000,
   },
@@ -25,6 +27,6 @@ module.exports = defineConfig({
     {
       name: "stealth",
       testMatch: /stealth\.test\./,
-    }
+    },
   ],
 });
