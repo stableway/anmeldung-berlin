@@ -21,6 +21,8 @@ const test = require("../src/test.js")({
   OTV_NATIONALITY: null,
   OTV_NATIONALITY_OF_FAMILY: null,
   OTV_LAST_NAME: null,
+  OTV_REASON_TYPE: "Erwerbstätigkeit",
+  OTV_REASON: "selbstständigen Tätigkeit - Erteilung",
 });
 
 test("appointment", async ({ context, params }, testInfo) => {
@@ -44,46 +46,45 @@ test("appointment", async ({ context, params }, testInfo) => {
       lastName: params.OTV_LAST_NAME,
     });
     return;
-  } else {
-    const dateURLs = await getDateURLs(servicePage, {
-      locations: params.APPOINTMENT_LOCATIONS,
-      earliestDate: params.APPOINTMENT_EARLIEST_DATE,
-      latestDate: params.APPOINTMENT_LATEST_DATE,
-    });
-    expect(dateURLs.length, "No available appointment dates").toBeGreaterThan(
-      0
-    );
+  }
+  const dateURLs = await getDateURLs(servicePage, {
+    locations: params.APPOINTMENT_LOCATIONS,
+    earliestDate: params.APPOINTMENT_EARLIEST_DATE,
+    latestDate: params.APPOINTMENT_LATEST_DATE,
+  });
+  expect(dateURLs.length, "No available appointment dates").toBeGreaterThan(
+    0
+  );
 
-    const appointmentURLs = await getAppointmentURLs(context, dateURLs, {
-      earliestTime: params.APPOINTMENT_EARLIEST_TIME,
-      latestTime: params.APPOINTMENT_LATEST_TIME,
-    });
-    expect(
-      appointmentURLs.length,
-      "No available appointments on any appointment date"
-    ).toBeGreaterThan(0);
+  const appointmentURLs = await getAppointmentURLs(context, dateURLs, {
+    earliestTime: params.APPOINTMENT_EARLIEST_TIME,
+    latestTime: params.APPOINTMENT_LATEST_TIME,
+  });
+  expect(
+    appointmentURLs.length,
+    "No available appointments on any appointment date"
+  ).toBeGreaterThan(0);
 
-    for (const appointmentURL of appointmentURLs) {
-      try {
-        await bookAppointment(
-          context,
-          appointmentURL,
-          {
-            mailSlurpAPIKey: params.MAILSLURP_API_KEY,
-            mailSlurpInboxId: params.MAILSLURP_INBOX_ID,
-            formName: params.FORM_NAME,
-            formTakeSurvey: params.FORM_TAKE_SURVEY,
-            formNote: params.FORM_NOTE,
-            formPhone: params.FORM_PHONE,
-          },
-          testInfo
-        );
-        return;
-      } catch (e) {
-        logger.error(
-          `Booking appointment failed at ${appointmentURL}: ${e.message}`
-        );
-      }
+  for (const appointmentURL of appointmentURLs) {
+    try {
+      await bookAppointment(
+        context,
+        appointmentURL,
+        {
+          mailSlurpAPIKey: params.MAILSLURP_API_KEY,
+          mailSlurpInboxId: params.MAILSLURP_INBOX_ID,
+          formName: params.FORM_NAME,
+          formTakeSurvey: params.FORM_TAKE_SURVEY,
+          formNote: params.FORM_NOTE,
+          formPhone: params.FORM_PHONE,
+        },
+        testInfo
+      );
+      return;
+    } catch (e) {
+      logger.error(
+        `Booking appointment failed at ${appointmentURL}: ${e.message}`
+      );
     }
   }
   throw new Error("Booking failed for all appointments.");
@@ -130,9 +131,9 @@ async function getServicePage(page, url) {
 async function getDateURLs(page, { locations, earliestDate, latestDate }) {
   return await test
     .step("get date urls", async () => {
-      page.on("load", async () => {
-        await Promise.all([checkRateLimitExceeded(page), checkCaptcha(page)]);
-      });
+      // page.on("load", async () => {
+      //   await Promise.all([checkRateLimitExceeded(page), checkCaptcha(page)]);
+      // });
       await selectLocations(page, {
         locations: locations ? locations.split(",") : [],
       });
@@ -562,44 +563,65 @@ async function otvAppointment(
           page.getByRole("heading", { name: "Sitzungsende" }),
           "Unexpectedly logged out"
         ).not.toBeVisible({ timeout: 1 }),
-        checkCaptcha(page),
-        checkRateLimitExceeded(page),
-        expect(
-          page.getByText("aktuell keine Termine frei"),
-          "No appointments currently available"
-        ).not.toBeVisible({ timeout: 1 }),
+        // expect(
+        //   page.getByText("aktuell keine Termine frei"),
+        //   "No appointments currently available"
+        // ).not.toBeVisible({ timeout: 1 }),
       ]);
     });
     await page.getByRole("link", { name: "Termin buchen" }).click();
     await page.waitForURL("**/otv.verwalt-berlin.de/**");
     await page.getByRole("link", { name: "Termin buchen" }).click();
-    await page.getByRole("checkbox").check();
+    await page.waitForURL("https://otv.verwalt-berlin.de/ams/TerminBuchen");
+    await page.getByRole("checkbox", { name: "Ich erkläre hiermit" }).check();
     await page.getByRole("button", { name: "Weiter" }).click();
-    await page.getByLabel("Staatsangehörigkeit").selectOption(nationality);
-    await page.getByLabel("Anzahl der Personen").selectOption(numberOfPeople);
     await page
-      .getByLabel("mit einem Familienangehörigen")
-      .selectOption(withFamily === "true" ? "1" : "2");
-    if (withFamily) {
-      await page
-        .getByLabel("Staatsangehörigkeit des Familienangehörigen")
-        .selectOption(familyNationality);
-    }
-    await page.getByLabel(serviceName).check();
-    if (
-      serviceName === "Aufenthaltstitel - beantragen" ||
-      serviceName === "Aufenthaltstitel - verlängern"
-    ) {
-      await page.getByLabel(residenceReasonType).check();
+      .getByLabel("Staatsangehörigkeit (Wenn Sie")
+      .selectOption(nationality);
+    await page.locator("#xi-sel-422").selectOption(numberOfPeople);
+    await expect(async () => {
+      const withFamilyLocator = page.getByLabel(
+        "Leben Sie in Berlin zusammen mit einem Familienangehörigen (z.B. Ehepartner, Kind)*",
+        { exact: true }
+      );
+      // Select the wrong option first to retry selecting the correct option.
+      await withFamilyLocator.selectOption(withFamily === "true" ? "2" : "1");
+      // Select the correct option.
+      await withFamilyLocator.selectOption(withFamily === "true" ? "1" : "2");
+      // TODO: familyNationalityLocator is untested so far.
+      const familyNationalityLocator = page.getByLabel(
+        "Staatsangehörigkeit des Familienangehörigen"
+      );
+      if (await familyNationalityLocator.isVisible()) {
+        await familyNationalityLocator.selectOption(familyNationality);
+      }
+      await expect(page.getByLabel(serviceName)).toHaveCount(1);
+    }).toPass();
+    // TODO: serviceLocator is not visible for some reason.
+    const serviceLocator = page.getByLabel(serviceName);
+    await serviceLocator.check();
+    // TODO: Everything below is untested so far.
+    const residenceReasonTypeLocator = page.getByLabel(residenceReasonType);
+    if (await residenceReasonTypeLocator.isVisible()) {
+      await residenceReasonTypeLocator.check();
     }
     await page.getByLabel(residenceReason).check();
-    if (
-      residenceReason === "Aufenthaltsgestattung - verlängern" ||
-      residenceReason === "Duldung - verlängern"
-    ) {
-      await page.getByLabel("Nachnamen").fill(lastName);
+    const lastNameLocator = page.getByLabel("Nachnamen");
+    if (await lastNameLocator.isVisible()) {
+      await lastNameLocator.fill(lastName);
     }
     await page.getByRole("button", { name: "Weiter" }).click();
-    // TODO: If we actually get a calendar, book the appointment lol
+    await page.getByRole("row").getByRole("link").first().click();
+    await page
+      .getByLabel("Bitte wählen Sie einen Tag")
+      .selectOption({ label: /d{2}:\d{2}/ });
+    // Solve captcha with 2Captcha chrome extension
+    // TODO: Solve captcha with 2Captcha API
+    await page.locator(".captcha-solver").click();
+    await expect(
+      page.locator(`.captcha-solver[data-state="solved"]`)
+    ).toBeVisible({ timeout: 150_000 });
+    // Submit booking
+    await page.getByRole("button", { name: "Weiter" }).click();
   });
 }

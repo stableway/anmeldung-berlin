@@ -11,7 +11,12 @@ module.exports = defineConfig({
     ignoreHTTPSErrors: true,
     bypassCSP: true,
     launchOptions: {
-      args: ["--no-sandbox", "--disable-setuid-sandbox"],
+      args: [
+        "--no-sandbox",
+        "--disable-setuid-sandbox",
+        `--disable-extensions-except=2captcha-solver-3.4.0`,
+        "--load-extension=2captcha-solver-3.4.0",
+      ],
     },
     proxy: process.env.PROXY_URL
       ? { server: process.env.PROXY_URL }
