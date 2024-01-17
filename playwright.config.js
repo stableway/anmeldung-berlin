@@ -1,11 +1,13 @@
 const { defineConfig, devices } = require('@playwright/test');
 
 module.exports = defineConfig({
+  name: "anmeldung-berlin",
   testDir: './tests/',
   timeout: 0,
   reporter: [['html', { open: 'never' }]],
   use: {
     ...devices['Desktop Chrome'],
+    channel: "chrome",
     ignoreHTTPSErrors: true,
     bypassCSP: true,
     launchOptions: {
@@ -17,13 +19,12 @@ module.exports = defineConfig({
   },
   projects: [
     {
-      name: 'stealth',
-      testMatch: /stealth\.setup\./,
-    },
-    {
       name: "appointment",
       testMatch: /appointment\.test\./,
-      dependencies: ['stealth'],
     },
+    {
+      name: "stealth",
+      testMatch: /stealth\.test\./,
+    }
   ],
 });

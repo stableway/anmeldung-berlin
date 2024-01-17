@@ -47,8 +47,8 @@ Run the program from the command line.
 npx extract-stealth-evasions
 # Install dependencies
 npm i
-# Install browsers
-npx playwright install chromium
+# Install Chrome browser
+npx playwright install chrome
 # Book an "Anmeldung einer Wohnung" appointment
 MAILSLURP_API_KEY=*your-api-key* FORM_NAME=*your-name* FORM_PHONE=*your-phone-number* \
     npm start
@@ -118,6 +118,6 @@ If you're planning to contribute to the project, install dev dependencies and us
 
 ```bash
 npm i --include=dev
-npx eslint --fix tests/
-npx prettier -w tests/
+npx eslint --fix tests/ src/
+npx prettier -w tests/ src/
 ```
