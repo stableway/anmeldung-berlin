@@ -52,9 +52,7 @@ test("appointment", async ({ context, params }, testInfo) => {
     earliestDate: params.APPOINTMENT_EARLIEST_DATE,
     latestDate: params.APPOINTMENT_LATEST_DATE,
   });
-  expect(dateURLs.length, "No available appointment dates").toBeGreaterThan(
-    0
-  );
+  expect(dateURLs.length, "No available appointment dates").toBeGreaterThan(0);
 
   const appointmentURLs = await getAppointmentURLs(context, dateURLs, {
     earliestTime: params.APPOINTMENT_EARLIEST_TIME,
@@ -554,6 +552,12 @@ async function otvAppointment(
   }
 ) {
   return test.step("otv appointment", async () => {
+    const RESOURCE_EXCLUSTIONS = ["stylesheet"];
+    await page.route("**/*", (route) => {
+      return RESOURCE_EXCLUSTIONS.includes(route.request().resourceType())
+        ? route.abort()
+        : route.continue();
+    });
     page.on("load", async (page) => {
       await Promise.all([
         expect(page, "Unexpectedly logged out").not.toHaveURL("**/logout", {
@@ -563,10 +567,10 @@ async function otvAppointment(
           page.getByRole("heading", { name: "Sitzungsende" }),
           "Unexpectedly logged out"
         ).not.toBeVisible({ timeout: 1 }),
-        // expect(
-        //   page.getByText("aktuell keine Termine frei"),
-        //   "No appointments currently available"
-        // ).not.toBeVisible({ timeout: 1 }),
+        expect(
+          page.locator(".errorMessage"), // page.getByText("Für die gewählte Dienstleistung sind aktuell keine Termine frei! Bitte versuchen Sie es zu einem späteren Zeitpunkt erneut."),
+          "No appointments currently available"
+        ).not.toBeVisible({ timeout: 1 }),
       ]);
     });
     await page.getByRole("link", { name: "Termin buchen" }).click();
@@ -579,6 +583,7 @@ async function otvAppointment(
       .getByLabel("Staatsangehörigkeit (Wenn Sie")
       .selectOption(nationality);
     await page.locator("#xi-sel-422").selectOption(numberOfPeople);
+    const serviceLocator = page.getByLabel(serviceName);
     await expect(async () => {
       const withFamilyLocator = page.getByLabel(
         "Leben Sie in Berlin zusammen mit einem Familienangehörigen (z.B. Ehepartner, Kind)*",
@@ -592,36 +597,44 @@ async function otvAppointment(
       const familyNationalityLocator = page.getByLabel(
         "Staatsangehörigkeit des Familienangehörigen"
       );
+      await page.waitForTimeout(500); // Wait for the form to load.
       if (await familyNationalityLocator.isVisible()) {
         await familyNationalityLocator.selectOption(familyNationality);
       }
-      await expect(page.getByLabel(serviceName)).toHaveCount(1);
+      await expect(serviceLocator).toHaveCount(1);
     }).toPass();
-    // TODO: serviceLocator is not visible for some reason.
-    const serviceLocator = page.getByLabel(serviceName);
+    await expect(serviceLocator).toBeVisible();
     await serviceLocator.check();
-    // TODO: Everything below is untested so far.
     const residenceReasonTypeLocator = page.getByLabel(residenceReasonType);
+    await page.waitForTimeout(500); // Wait for the form to load.
     if (await residenceReasonTypeLocator.isVisible()) {
       await residenceReasonTypeLocator.check();
     }
     await page.getByLabel(residenceReason).check();
     const lastNameLocator = page.getByLabel("Nachnamen");
+    await page.waitForTimeout(500); // Wait for the form to load.
     if (await lastNameLocator.isVisible()) {
       await lastNameLocator.fill(lastName);
     }
     await page.getByRole("button", { name: "Weiter" }).click();
+    await page.waitForLoadState();
+    // TODO: Everything below is untested so far.
     await page.getByRole("row").getByRole("link").first().click();
     await page
       .getByLabel("Bitte wählen Sie einen Tag")
       .selectOption({ label: /d{2}:\d{2}/ });
-    // Solve captcha with 2Captcha chrome extension
     // TODO: Solve captcha with 2Captcha API
-    await page.locator(".captcha-solver").click();
-    await expect(
-      page.locator(`.captcha-solver[data-state="solved"]`)
-    ).toBeVisible({ timeout: 150_000 });
+    // Solve captcha with 2Captcha chrome extension
+    const captchaSolver = page.locator(".captcha-solver");
+    await captchaSolver.click();
+    await expect(captchaSolver, "Captcha solver didn't solve").toHaveAttribute(
+      "data-state",
+      "solved",
+      { timeout: 150_000 }
+    );
     // Submit booking
     await page.getByRole("button", { name: "Weiter" }).click();
+    await page.waitForLoadState();
+    // TODO: Save booking confirmation or handle whatever comes next.
   });
 }
