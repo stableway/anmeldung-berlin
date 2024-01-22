@@ -16,6 +16,7 @@ module.exports = defineConfig({
         "--disable-setuid-sandbox",
         `--disable-extensions-except=2captcha-solver-3.4.0`,
         "--load-extension=2captcha-solver-3.4.0",
+        "--headless=new",
       ],
     },
     proxy: process.env.PROXY_URL

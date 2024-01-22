@@ -2,12 +2,13 @@ const { test } = require("@playwright/test");
 
 module.exports = (defaultParams) =>
   test.extend({
-    context: async ({ context }, use) => {
+    context: async ({ playwright, browserName }, use) => {
+      const context = await playwright[browserName].launchPersistentContext("");
       await context.addInitScript({ path: "stealth.min.js" });
       await use(context);
     },
-    page: async ({ page }, use) => {
-      await page.addInitScript({ path: "stealth.min.js" });
+    page: async ({ context }, use) => {
+      const page = await context.newPage();
       await use(page);
     },
     params: [
