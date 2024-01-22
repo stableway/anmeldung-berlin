@@ -561,16 +561,16 @@ async function otvAppointment(
     page.on("load", async (page) => {
       await Promise.all([
         expect(page, "Unexpectedly logged out").not.toHaveURL("**/logout", {
-          timeout: 1,
+          timeout: 250,
         }),
         expect(
           page.getByRole("heading", { name: "Sitzungsende" }),
           "Unexpectedly logged out"
-        ).not.toBeVisible({ timeout: 1 }),
+        ).not.toBeVisible({ timeout: 250 }),
         expect(
           page.locator(".errorMessage"), // page.getByText("Für die gewählte Dienstleistung sind aktuell keine Termine frei! Bitte versuchen Sie es zu einem späteren Zeitpunkt erneut."),
           "No appointments currently available"
-        ).not.toBeVisible({ timeout: 1 }),
+        ).not.toBeVisible({ timeout: 250 }),
       ]);
     });
     await page.getByRole("link", { name: "Termin buchen" }).click();
