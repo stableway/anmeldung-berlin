@@ -10,6 +10,4 @@ COPY . .
 
 ENV NODE_ENV=production
 
-ENTRYPOINT [ "npm" ]
-
-CMD [ "start" ]
+CMD [ "npm", "start" ]
