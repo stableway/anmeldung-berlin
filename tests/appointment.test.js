@@ -498,12 +498,12 @@ function checkRateLimitExceeded(page) {
   return expect(
     page.getByRole("heading", { name: "Zu viele Zugriffe" }),
     "Rate limit exceeded"
-  ).not.toBeVisible({ timeout: 1 });
+  ).not.toBeVisible({ timeout: 250 });
 }
 
 function checkCaptcha(page) {
   return expect(
     page.getByRole("heading", { name: "Bitte verifizieren sie sich" }),
     "Blocked by captcha"
-  ).not.toBeVisible({ timeout: 1 });
+  ).not.toBeVisible({ timeout: 250 });
 }
