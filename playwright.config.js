@@ -4,6 +4,7 @@ module.exports = defineConfig({
   name: "anmeldung-berlin",
   testDir: "./tests/",
   timeout: 0,
+  retries: parseInt(process.env.RETRY_COUNT || "0"),
   reporter: [["html", { open: "never" }]],
   use: {
     ...devices["Desktop Chrome"],

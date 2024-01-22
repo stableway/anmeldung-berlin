@@ -30,8 +30,8 @@ test.afterEach(async ({ context }, testInfo) => {
  await context.close()
  if (testInfo.status !== testInfo.expectedStatus) {
    logger.warn(`Appointment booking failed: ${testInfo.error.message}`);
-   if (testInfo.error.message === "Rate limit exceeded") {
-     const waitSeconds = parseInt(process.env.RETRY_WAIT_SECONDS_BLOCKED || "600");
+   if (testInfo.error.message.match(/Rate limit exceeded/)) {
+     const waitSeconds = parseInt(process.env.RETRY_WAIT_SECONDS_BLOCKED || "0");
      logger.info(`Waiting ${waitSeconds} seconds because we were rate limited ...`);
      await sleep(waitSeconds * 1000);
    }
