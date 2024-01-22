@@ -573,15 +573,17 @@ async function otvAppointment(
         ).not.toBeVisible({ timeout: 250 }),
       ]);
     });
+    const loadingLocator = page.locator(".loading").first();
     await page.getByRole("link", { name: "Termin buchen" }).click();
     await page.waitForURL("**/otv.verwalt-berlin.de/**");
     await page.getByRole("link", { name: "Termin buchen" }).click();
-    await page.waitForURL("https://otv.verwalt-berlin.de/ams/TerminBuchen");
+    await page.waitForURL("**/otv.verwalt-berlin.de/ams/TerminBuchen");
     await page.getByRole("checkbox", { name: "Ich erkläre hiermit" }).check();
     await page.getByRole("button", { name: "Weiter" }).click();
     await page
       .getByLabel("Staatsangehörigkeit (Wenn Sie")
       .selectOption(nationality);
+    // TODO: Use locator like .getByLabel("Anzahl der Personen")
     await page.locator("#xi-sel-422").selectOption(numberOfPeople);
     const serviceLocator = page.getByLabel(serviceName);
     await expect(async () => {
@@ -597,7 +599,7 @@ async function otvAppointment(
       const familyNationalityLocator = page.getByLabel(
         "Staatsangehörigkeit des Familienangehörigen"
       );
-      await page.waitForTimeout(500); // Wait for the form to load.
+      await page.waitForTimeout(250); // Wait for the form to load.
       if (await familyNationalityLocator.isVisible()) {
         await familyNationalityLocator.selectOption(familyNationality);
       }
@@ -606,25 +608,33 @@ async function otvAppointment(
     await expect(serviceLocator).toBeVisible();
     await serviceLocator.check();
     const residenceReasonTypeLocator = page.getByLabel(residenceReasonType);
-    await page.waitForTimeout(500); // Wait for the form to load.
+    await expect(loadingLocator).not.toBeVisible();
+    await page.waitForTimeout(250); // Wait for the form to load.
     if (await residenceReasonTypeLocator.isVisible()) {
       await residenceReasonTypeLocator.check();
     }
     await page.getByLabel(residenceReason).check();
     const lastNameLocator = page.getByLabel("Nachnamen");
-    await page.waitForTimeout(500); // Wait for the form to load.
+    await expect(loadingLocator).not.toBeVisible();
+    await page.waitForTimeout(250); // Wait for the form to load.
     if (await lastNameLocator.isVisible()) {
       await lastNameLocator.fill(lastName);
     }
     await page.getByRole("button", { name: "Weiter" }).click();
-    await page.waitForLoadState();
-    // TODO: Everything below is untested so far.
-    await page.getByRole("row").getByRole("link").first().click();
+    const availableAppointments = await page.getByRole("row").getByRole("link");
+    await expect(loadingLocator).not.toBeVisible();
+    await page.waitForTimeout(250); // Wait for the form to load.
+    await availableAppointments.first().click();
+    await expect(loadingLocator).not.toBeVisible();
+    await page.waitForTimeout(250); // Wait for the form to load.
     await page
-      .getByLabel("Bitte wählen Sie einen Tag")
-      .selectOption({ label: /d{2}:\d{2}/ });
+      // TODO: Use locator like .getByLabel("Bitte wählen Sie einen Tag")
+      .locator("xi-sel-3")
+      .selectOption(/\d{1,2}:\d{2}/);
     // TODO: Solve captcha with 2Captcha API
     // Solve captcha with 2Captcha chrome extension
+    await expect(loadingLocator).not.toBeVisible();
+    await page.waitForTimeout(250); // Wait for the form to load.
     const captchaSolver = page.locator(".captcha-solver");
     await captchaSolver.click();
     await expect(captchaSolver, "Captcha solver didn't solve").toHaveAttribute(
