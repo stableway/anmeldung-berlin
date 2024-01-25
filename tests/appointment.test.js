@@ -2,33 +2,60 @@ const { expect } = require("@playwright/test");
 const MailSlurp = require("mailslurp-client").default;
 const Promise = require("bluebird");
 const logger = require("../src/logger");
-const test = require("../src/test.js")({
-  MAILSLURP_API_KEY: null,
-  MAILSLURP_INBOX_ID: null,
-  FORM_NAME: null,
-  FORM_PHONE: null,
-  FORM_NOTE: null,
-  FORM_TAKE_SURVEY: "false",
-  APPOINTMENT_SERVICE: "Anmeldung einer Wohnung",
-  APPOINTMENT_LOCATIONS: null,
-  APPOINTMENT_EARLIEST_DATE: "1970-01-01 GMT",
-  APPOINTMENT_LATEST_DATE: "2069-12-31 GMT",
-  APPOINTMENT_EARLIEST_TIME: "00:00 GMT",
-  APPOINTMENT_LATEST_TIME: "23:59 GMT",
-  OTV_SERVICE: "Aufenthaltstitel - beantragen",
-  OTV_NUMBER_OF_PEOPLE: "1",
-  OTV_LIVE_WITH_FAMILY: "false",
-  OTV_NATIONALITY: null,
-  OTV_NATIONALITY_OF_FAMILY: null,
-  OTV_LAST_NAME: null,
-  OTV_REASON_TYPE: "Erwerbstätigkeit",
-  OTV_REASON: "selbstständigen Tätigkeit - Erteilung",
+const base = require("../src/test.js");
+
+const test = base.extend({
+  mailslurpApiKey: [null, { option: true }],
+  mailslurpInboxId: [null, { option: true }],
+  formName: [null, { option: true }],
+  formPhone: [null, { option: true }],
+  formNote: [null, { option: true }],
+  formTakeSurvey: ["false", { option: true }],
+  appointmentService: ["Anmeldung einer Wohnung", { option: true }],
+  appointmentLocations: [null, { option: true }],
+  appointmentEarliestDate: ["1970-01-01 GMT", { option: true }],
+  appointmentLatestDate: ["2069-12-31 GMT", { option: true }],
+  appointmentEarliestTime: ["00:00 GMT", { option: true }],
+  appointmentLatestTime: ["23:59 GMT", { option: true }],
+  otvNationality: [null, { option: true }],
+  otvNumberOfPeople: [null, { option: true }],
+  otvLiveWithFamily: [null, { option: true }],
+  otvNationalityOfFamily: [null, { option: true }],
+  otvService: [null, { option: true }],
+  otvReasonType:[null, { option: true }],
+  otvReason: [null, { option: true }],
+  otvLastName: [null, { option: true }],
+  otvFirstName: [null, { option: true }],
+  otvBirthDate: [null, { option: true }],
+  otvEmail: [null, { option: true }],
 });
 
-test("appointment", async ({ context, params }, testInfo) => {
-  logger.debug(JSON.stringify(params, null, 2));
+test("appointment", async ({ context, mailslurpApiKey,
+  mailslurpInboxId,
+  formName,
+  formPhone,
+  formNote,
+  formTakeSurvey,
+  appointmentService,
+  appointmentLocations,
+  appointmentEarliestDate,
+  appointmentLatestDate,
+  appointmentEarliestTime,
+  appointmentLatestTime,
+  otvService,
+  otvNumberOfPeople,
+  otvLiveWithFamily,
+  otvNationality,
+  otvNationalityOfFamily,
+  otvLastName,
+  otvReasonType,
+  otvReason,
+  otvFirstName,
+  otvBirthDate,
+  otvEmail,
+  }, testInfo) => {
   const serviceURL = await getServiceURL(await context.newPage(), {
-    serviceName: params.APPOINTMENT_SERVICE,
+    serviceName: appointmentService,
   });
   const servicePage = await getServicePage(await context.newPage(), serviceURL);
   const otvBookingLinkLocator = servicePage.getByRole("link", {
@@ -36,27 +63,30 @@ test("appointment", async ({ context, params }, testInfo) => {
   });
   if (await otvBookingLinkLocator.isVisible()) {
     await otvAppointment(servicePage, {
-      nationality: params.OTV_NATIONALITY,
-      numberOfPeople: params.OTV_NUMBER_OF_PEOPLE,
-      withFamily: params.OTV_LIVE_WITH_FAMILY,
-      serviceName: params.OTV_SERVICE,
-      familyNationality: params.OTV_NATIONALITY_OF_FAMILY,
-      residenceReasonType: params.OTV_REASON_TYPE,
-      residenceReason: params.OTV_REASON,
-      lastName: params.OTV_LAST_NAME,
+      nationality: otvNationality,
+      numberOfPeople: otvNumberOfPeople,
+      withFamily: otvLiveWithFamily,
+      familyNationality: otvNationalityOfFamily,
+      serviceName: otvService,
+      residenceReasonType: otvReasonType,
+      residenceReason: otvReason,
+      lastName: otvLastName,
+      firstName: otvFirstName,
+      birthDate: otvBirthDate,
+      email: otvEmail,
     });
     return;
   }
   const dateURLs = await getDateURLs(servicePage, {
-    locations: params.APPOINTMENT_LOCATIONS,
-    earliestDate: params.APPOINTMENT_EARLIEST_DATE,
-    latestDate: params.APPOINTMENT_LATEST_DATE,
+    locations: appointmentLocations,
+    earliestDate: appointmentEarliestDate,
+    latestDate:  appointmentLatestDate,
   });
   expect(dateURLs.length, "No available appointment dates").toBeGreaterThan(0);
 
   const appointmentURLs = await getAppointmentURLs(context, dateURLs, {
-    earliestTime: params.APPOINTMENT_EARLIEST_TIME,
-    latestTime: params.APPOINTMENT_LATEST_TIME,
+    earliestTime: appointmentEarliestTime,
+    latestTime: appointmentLatestTime,
   });
   expect(
     appointmentURLs.length,
@@ -69,12 +99,12 @@ test("appointment", async ({ context, params }, testInfo) => {
         context,
         appointmentURL,
         {
-          mailSlurpAPIKey: params.MAILSLURP_API_KEY,
-          mailSlurpInboxId: params.MAILSLURP_INBOX_ID,
-          formName: params.FORM_NAME,
-          formTakeSurvey: params.FORM_TAKE_SURVEY,
-          formNote: params.FORM_NOTE,
-          formPhone: params.FORM_PHONE,
+          mailSlurpAPIKey: mailslurpApiKey,
+          mailSlurpInboxId: mailslurpInboxId,
+          formName: formName,
+          formTakeSurvey: formTakeSurvey,
+          formNote: formNote,
+          formPhone: formPhone,
         },
         testInfo
       );
@@ -542,13 +572,16 @@ async function otvAppointment(
   page,
   {
     nationality,
-    numberOfPeople = "1",
-    withFamily = "false",
-    serviceName = "Aufenthaltstitel - beantragen",
-    familyNationality = null,
-    residenceReasonType = "Erwerbstätigkeit",
-    residenceReason = "selbstständigen Tätigkeit - Erteilung",
-    lastName = null,
+    numberOfPeople,
+    withFamily,
+    serviceName,
+    familyNationality,
+    residenceReasonType,
+    residenceReason,
+    lastName,
+    firstName,
+    birthDate,
+    email,
   }
 ) {
   return test.step("otv appointment", async () => {
@@ -580,6 +613,7 @@ async function otvAppointment(
     await page.waitForURL("**/otv.verwalt-berlin.de/ams/TerminBuchen");
     await page.getByRole("checkbox", { name: "Ich erkläre hiermit" }).check();
     await page.getByRole("button", { name: "Weiter" }).click();
+    await page.waitForURL("**/otv.verwalt-berlin.de/ams/TerminBuchen");
     await page
       .getByLabel("Staatsangehörigkeit (Wenn Sie")
       .selectOption(nationality);
@@ -599,42 +633,43 @@ async function otvAppointment(
       const familyNationalityLocator = page.getByLabel(
         "Staatsangehörigkeit des Familienangehörigen"
       );
-      await page.waitForTimeout(250); // Wait for the form to load.
+      await page.waitForTimeout(500); // Wait for the form to load.
       if (await familyNationalityLocator.isVisible()) {
         await familyNationalityLocator.selectOption(familyNationality);
       }
       await expect(serviceLocator).toHaveCount(1);
     }).toPass();
-    await expect(serviceLocator).toBeVisible();
+    await expect(loadingLocator).not.toBeVisible({timeout: 20_000});
+    // await expect(serviceLocator).toBeVisible();
     await serviceLocator.check();
     const residenceReasonTypeLocator = page.getByLabel(residenceReasonType);
-    await expect(loadingLocator).not.toBeVisible();
-    await page.waitForTimeout(250); // Wait for the form to load.
+    await expect(loadingLocator).not.toBeVisible({timeout: 20_000});
+    await page.waitForTimeout(500); // Wait for the form to load.
     if (await residenceReasonTypeLocator.isVisible()) {
       await residenceReasonTypeLocator.check();
     }
     await page.getByLabel(residenceReason).check();
     const lastNameLocator = page.getByLabel("Nachnamen");
-    await expect(loadingLocator).not.toBeVisible();
-    await page.waitForTimeout(250); // Wait for the form to load.
+    await expect(loadingLocator).not.toBeVisible({timeout: 60_000});
+    await page.waitForTimeout(500); // Wait for the form to load.
     if (await lastNameLocator.isVisible()) {
       await lastNameLocator.fill(lastName);
     }
     await page.getByRole("button", { name: "Weiter" }).click();
     const availableAppointments = await page.getByRole("row").getByRole("link");
-    await expect(loadingLocator).not.toBeVisible();
-    await page.waitForTimeout(250); // Wait for the form to load.
+    await expect(loadingLocator).not.toBeVisible({ timeout: 60_000 });
+    await page.waitForTimeout(500); // Wait for the form to load.
     await availableAppointments.first().click();
-    await expect(loadingLocator).not.toBeVisible();
-    await page.waitForTimeout(250); // Wait for the form to load.
+    await expect(loadingLocator).not.toBeVisible({ timeout: 60_000 });
+    await page.waitForTimeout(500); // Wait for the form to load.
     await page
-      // TODO: Use locator like .getByLabel("Bitte wählen Sie einen Tag")
-      .locator("xi-sel-3")
+      // TODO: Use locator like locator.getByLabel("Bitte wählen Sie einen Tag")
+      .locator("#xi-sel-3")
       .selectOption(/\d{1,2}:\d{2}/);
     // TODO: Solve captcha with 2Captcha API
     // Solve captcha with 2Captcha chrome extension
-    await expect(loadingLocator).not.toBeVisible();
-    await page.waitForTimeout(250); // Wait for the form to load.
+    await expect(loadingLocator).not.toBeVisible({timeout: 60_000});
+    await page.waitForTimeout(500); // Wait for the form to load.
     const captchaSolver = page.locator(".captcha-solver");
     await captchaSolver.click();
     await expect(captchaSolver, "Captcha solver didn't solve").toHaveAttribute(
@@ -644,7 +679,19 @@ async function otvAppointment(
     );
     // Submit booking
     await page.getByRole("button", { name: "Weiter" }).click();
+    // FIXME: waitForLoadState not working.
     await page.waitForLoadState();
+    await expect(loadingLocator).not.toBeVisible({timeout: 60_000});
+    await page.waitForTimeout(500); // Wait for the form to load.
+    await page.locator('input[name="antragsteller_vname"]').fill(firstName);
+    await page.locator('input[name="antragsteller_nname"]').fill(lastName);
+    await page.locator('input[name="antragsteller_gebDatum"]').fill(birthDate);
+    await page.locator('input[name="antragsteller_email"]').fill(email);
+    await page.getByRole("button", { name: "Weiter" }).click();
+    await page.waitForLoadState();
+    await page.getByRole("button", { name: "Termin buchen" }).click();
+    await page.waitForLoadState();
+    await page.waitForTimeout(60_000);
     // TODO: Save booking confirmation or handle whatever comes next.
   });
 }

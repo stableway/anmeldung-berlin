@@ -4,7 +4,10 @@
   "description": "This app will find and book any [service.berlin.de](https://service.berlin.de) appointment that can be booked online.",
   "scripts": {
     "start": "npx playwright test --project=appointment",
-    "debug": "LOGLEVEL=debug npx playwright test --headed --trace=on --project=appointment"
+    "debug": "LOGLEVEL=debug npx playwright test --headed --trace=on --project=appointment",
+    "test:service:debug": "LOGLEVEL=debug npx playwright test --headed --trace=on --project=sevice.berlin.de",
+    "test:otv:debug": "LOGLEVEL=debug npx playwright test --headed --trace=on --project=otv.verwalt-berlin.de",
+    "test:stealth": "npx playwright test --headed --project=stealth"
   },
   "author": "Daniel Cortez Stevenson",
   "license": "MIT",

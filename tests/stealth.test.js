@@ -1,5 +1,5 @@
 const { expect } = require("@playwright/test");
-const test = require("../src/test")({});
+const test = require("../src/test");
 
 test.describe("stealth", () => {
   test.describe("SannySoft", () => {

@@ -8,7 +8,11 @@ This app will find and book any [service.berlin.de](https://service.berlin.de) a
 
 Get a [MailSlurp API key here](https://app.mailslurp.com/sign-up/).
 
-### 2a. Run with Docker (recommended)
+### 2. Download the 2Captcha Chrome Extension
+
+Download the [latest release here](https://github.com/daniel-cortez-stevenson/2captcha-solver/tags). Unzip the file so that you have a folder called `2captcha-solver-3.4.0` in the project root directory.
+
+### 3a. Run with Docker (recommended)
 
 Build & run Docker container.
 
@@ -38,7 +42,7 @@ docker run \
     anmeldung-berlin
 ```
 
-### 2b. Run Locally on Mac OS
+### 3b. Run Locally on Mac OS
 
 Run the program from the command line.
 
@@ -84,6 +88,17 @@ Environment Variable | Parameter Default | Description
  `APPOINTMENT_LATEST_DATE` | `"2069-12-31 GMT"` | Latest date for appointment.
  `APPOINTMENT_EARLIEST_TIME` | `"00:00 GMT"` | Earliest time for appointment.
  `APPOINTMENT_LATEST_TIME` | `"23:59 GMT"` | Latest time for appointment.
+ `OTV_NATIONALITY` | `null` | Your nationality for OTV appointment.
+ `OTV_NUMBER_OF_PEOPLE` | `null` | Number of people for OTV appointment.
+ `OTV_LIVE_WITH_FAMILY` | `null` | Do you live with family for OTV appointment.
+ `OTV_NATIONALITY_OF_FAMILY` | `null` | Nationality of family for OTV appointment.
+ `OTV_SERVICE` | `null` | Service for OTV appointment.
+ `OTV_REASON_TYPE` | `null` | Reason type for OTV appointment.
+ `OTV_REASON` | `null` | Reason for OTV appointment.
+ `OTV_LAST_NAME` | `null` | Last name for OTV appointment.
+ `OTV_FIRST_NAME` | `null` | First name for OTV appointment.
+ `OTV_BIRTH_DATE` | `null` | Birth date for OTV appointment.
+ `OTV_EMAIL` | `null` | Email address for OTV appointment.
 
 ## Environment Variables
 
