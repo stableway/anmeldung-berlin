@@ -10,7 +10,7 @@ Get a [MailSlurp API key here](https://app.mailslurp.com/sign-up/).
 
 ### 2. Download the 2Captcha Chrome Extension
 
-Download the [latest release here](https://github.com/daniel-cortez-stevenson/2captcha-solver/tags). Unzip the file so that you have a folder called `2captcha-solver-3.4.0` in the project root directory.
+Download the [latest release here](https://github.com/daniel-cortez-stevenson/2captcha-solver/tags). Unzip the file so that you have a folder called `2captcha-solver` in the project root directory.
 
 ### 3a. Run with Docker (recommended)
 

@@ -16,8 +16,8 @@ const lowerCamelCaseEnv = Object.entries(process.env).reduce((acc, [key, value])
 const launchOptionsArgs = [
   "--no-sandbox",
   "--disable-setuid-sandbox",
-  `--disable-extensions-except=2captcha-solver-3.4.0`,
-  "--load-extension=2captcha-solver-3.4.0",
+  "--disable-extensions-except=2captcha-solver",
+  "--load-extension=2captcha-solver",
 ];
 
 if (process.env.HEADED !== "true") {
