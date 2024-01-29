@@ -5,7 +5,9 @@
   "scripts": {
     "start": "npx playwright test --project=appointment",
     "debug": "LOGLEVEL=debug npx playwright test --headed --trace=on --project=appointment",
+    "test:service": "npx playwright test --project=sevice.berlin.de",
     "test:service:debug": "LOGLEVEL=debug npx playwright test --headed --trace=on --project=sevice.berlin.de",
+    "test:otv": "npx playwright test --project=otv.verwalt-berlin.de",
     "test:otv:debug": "LOGLEVEL=debug npx playwright test --headed --trace=on --project=otv.verwalt-berlin.de",
     "test:stealth": "npx playwright test --headed --project=stealth"
   },
