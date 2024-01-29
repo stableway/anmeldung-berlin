@@ -74,7 +74,7 @@ test("appointment", async ({ context, mailslurpApiKey,
       firstName: otvFirstName,
       birthDate: otvBirthDate,
       email: otvEmail,
-    });
+    }, testInfo);
     return;
   }
   const dateURLs = await getDateURLs(servicePage, {
@@ -582,7 +582,8 @@ async function otvAppointment(
     firstName,
     birthDate,
     email,
-  }
+  },
+  testInfo,
 ) {
   return test.step("otv appointment", async () => {
     const RESOURCE_EXCLUSTIONS = ["stylesheet"];
@@ -691,7 +692,18 @@ async function otvAppointment(
     await page.waitForLoadState();
     await page.getByRole("button", { name: "Termin buchen" }).click();
     await page.waitForLoadState();
-    await page.waitForTimeout(60_000);
-    // TODO: Save booking confirmation or handle whatever comes next.
+
+    async function saveConfirmationPage(suffix) {
+      const filename = `web-confirmation-${suffix}`
+      const screenshot = await page.screenshot({ path: filename, fullPage: true });
+      return testInfo.attach(filename, {
+        body: screenshot,
+        contentType: "image/png",
+      });
+    }
+
+    const savedAt = timestamp();
+    await saveConfirmationPage(savedAt);
   });
 }
+
