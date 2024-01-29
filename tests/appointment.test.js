@@ -22,7 +22,7 @@ const test = base.extend({
   otvLiveWithFamily: [null, { option: true }],
   otvNationalityOfFamily: [null, { option: true }],
   otvService: [null, { option: true }],
-  otvReasonType:[null, { option: true }],
+  otvReasonType: [null, { option: true }],
   otvReason: [null, { option: true }],
   otvLastName: [null, { option: true }],
   otvFirstName: [null, { option: true }],
@@ -30,7 +30,9 @@ const test = base.extend({
   otvEmail: [null, { option: true }],
 });
 
-test("appointment", async ({ context, mailslurpApiKey,
+test("appointment", async ({
+  context,
+  mailslurpApiKey,
   mailslurpInboxId,
   formName,
   formPhone,
@@ -53,7 +55,7 @@ test("appointment", async ({ context, mailslurpApiKey,
   otvFirstName,
   otvBirthDate,
   otvEmail,
-  }, testInfo) => {
+}, testInfo) => {
   const serviceURL = await getServiceURL(await context.newPage(), {
     serviceName: appointmentService,
   });
@@ -62,25 +64,29 @@ test("appointment", async ({ context, mailslurpApiKey,
     name: "Termin buchen",
   });
   if (await otvBookingLinkLocator.isVisible()) {
-    await otvAppointment(servicePage, {
-      nationality: otvNationality,
-      numberOfPeople: otvNumberOfPeople,
-      withFamily: otvLiveWithFamily,
-      familyNationality: otvNationalityOfFamily,
-      serviceName: otvService,
-      residenceReasonType: otvReasonType,
-      residenceReason: otvReason,
-      lastName: otvLastName,
-      firstName: otvFirstName,
-      birthDate: otvBirthDate,
-      email: otvEmail,
-    }, testInfo);
+    await otvAppointment(
+      servicePage,
+      {
+        nationality: otvNationality,
+        numberOfPeople: otvNumberOfPeople,
+        withFamily: otvLiveWithFamily,
+        familyNationality: otvNationalityOfFamily,
+        serviceName: otvService,
+        residenceReasonType: otvReasonType,
+        residenceReason: otvReason,
+        lastName: otvLastName,
+        firstName: otvFirstName,
+        birthDate: otvBirthDate,
+        email: otvEmail,
+      },
+      testInfo
+    );
     return;
   }
   const dateURLs = await getDateURLs(servicePage, {
     locations: appointmentLocations,
     earliestDate: appointmentEarliestDate,
-    latestDate:  appointmentLatestDate,
+    latestDate: appointmentLatestDate,
   });
   expect(dateURLs.length, "No available appointment dates").toBeGreaterThan(0);
 
@@ -583,7 +589,7 @@ async function otvAppointment(
     birthDate,
     email,
   },
-  testInfo,
+  testInfo
 ) {
   return test.step("otv appointment", async () => {
     const RESOURCE_EXCLUSTIONS = ["stylesheet"];
@@ -640,18 +646,18 @@ async function otvAppointment(
       }
       await expect(serviceLocator).toHaveCount(1);
     }).toPass();
-    await expect(loadingLocator).not.toBeVisible({timeout: 20_000});
+    await expect(loadingLocator).not.toBeVisible({ timeout: 20_000 });
     // await expect(serviceLocator).toBeVisible();
     await serviceLocator.check();
     const residenceReasonTypeLocator = page.getByLabel(residenceReasonType);
-    await expect(loadingLocator).not.toBeVisible({timeout: 20_000});
+    await expect(loadingLocator).not.toBeVisible({ timeout: 20_000 });
     await page.waitForTimeout(500); // Wait for the form to load.
     if (await residenceReasonTypeLocator.isVisible()) {
       await residenceReasonTypeLocator.check();
     }
     await page.getByLabel(residenceReason).check();
     const lastNameLocator = page.getByLabel("Nachnamen");
-    await expect(loadingLocator).not.toBeVisible({timeout: 60_000});
+    await expect(loadingLocator).not.toBeVisible({ timeout: 60_000 });
     await page.waitForTimeout(500); // Wait for the form to load.
     if (await lastNameLocator.isVisible()) {
       await lastNameLocator.fill(lastName);
@@ -669,7 +675,7 @@ async function otvAppointment(
       .selectOption(/\d{1,2}:\d{2}/);
     // TODO: Solve captcha with 2Captcha API
     // Solve captcha with 2Captcha chrome extension
-    await expect(loadingLocator).not.toBeVisible({timeout: 60_000});
+    await expect(loadingLocator).not.toBeVisible({ timeout: 60_000 });
     await page.waitForTimeout(500); // Wait for the form to load.
     const captchaSolver = page.locator(".captcha-solver");
     await captchaSolver.click();
@@ -682,7 +688,7 @@ async function otvAppointment(
     await page.getByRole("button", { name: "Weiter" }).click();
     // FIXME: waitForLoadState not working.
     await page.waitForLoadState();
-    await expect(loadingLocator).not.toBeVisible({timeout: 60_000});
+    await expect(loadingLocator).not.toBeVisible({ timeout: 60_000 });
     await page.waitForTimeout(500); // Wait for the form to load.
     await page.locator('input[name="antragsteller_vname"]').fill(firstName);
     await page.locator('input[name="antragsteller_nname"]').fill(lastName);
@@ -694,8 +700,11 @@ async function otvAppointment(
     await page.waitForLoadState();
 
     async function saveConfirmationPage(suffix) {
-      const filename = `web-confirmation-${suffix}`
-      const screenshot = await page.screenshot({ path: filename, fullPage: true });
+      const filename = `web-confirmation-${suffix}`;
+      const screenshot = await page.screenshot({
+        path: filename,
+        fullPage: true,
+      });
       return testInfo.attach(filename, {
         body: screenshot,
         contentType: "image/png",
@@ -706,4 +715,3 @@ async function otvAppointment(
     await saveConfirmationPage(savedAt);
   });
 }
-

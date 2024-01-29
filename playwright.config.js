@@ -3,15 +3,18 @@ const { defineConfig, devices } = require("@playwright/test");
 // Function to convert a string to lower camel case
 const toLowerCamelCase = (str) => {
   return str
-      .toLowerCase()
-      .replace(/_./g, (match) => match.charAt(1).toUpperCase());
+    .toLowerCase()
+    .replace(/_./g, (match) => match.charAt(1).toUpperCase());
 };
 
 // Destructuring `process.env` into lower camel case form
-const lowerCamelCaseEnv = Object.entries(process.env).reduce((acc, [key, value]) => {
-  acc[toLowerCamelCase(key)] = value;
-  return acc;
-}, {});
+const lowerCamelCaseEnv = Object.entries(process.env).reduce(
+  (acc, [key, value]) => {
+    acc[toLowerCamelCase(key)] = value;
+    return acc;
+  },
+  {}
+);
 
 const launchOptionsArgs = [
   "--no-sandbox",
@@ -21,7 +24,7 @@ const launchOptionsArgs = [
 ];
 
 if (process.env.HEADED !== "true") {
-  launchOptionsArgs.push('--headless=new');
+  launchOptionsArgs.push("--headless=new");
 }
 
 module.exports = defineConfig({
@@ -66,7 +69,8 @@ module.exports = defineConfig({
       name: "otv.verwalt-berlin.de",
       testMatch: /appointment\.test\./,
       use: {
-        appointmentService: "Aufenthaltserlaubnis zur selbstständigen Tätigkeit - Erteilung",
+        appointmentService:
+          "Aufenthaltserlaubnis zur selbstständigen Tätigkeit - Erteilung",
         otvNationality: "Vereinigte Staaten von Amerika",
         otvNumberOfPeople: "2",
         otvLiveWithFamily: "true",
