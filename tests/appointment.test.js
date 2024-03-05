@@ -17,6 +17,31 @@ const test = require("../src/test.js")({
   APPOINTMENT_LATEST_TIME: "23:59 GMT",
 });
 
+// eslint-disable-next-line no-empty-pattern
+test.beforeEach(async ({}, testInfo) => {
+  if (testInfo.retry > 0) {
+    const waitSeconds = parseInt(process.env.RETRY_WAIT_SECONDS || "0");
+    logger.info(`Waiting ${waitSeconds} seconds then retrying ...`);
+    await sleep(waitSeconds * 1000);
+  }
+});
+
+test.afterEach(async ({ context }, testInfo) => {
+ await context.close()
+ if (testInfo.status !== testInfo.expectedStatus) {
+   logger.warn(`Appointment booking failed: ${testInfo.error.message}`);
+   if (testInfo.error.message.match(/Rate limit exceeded/)) {
+     const waitSeconds = parseInt(process.env.RETRY_WAIT_SECONDS_BLOCKED || "0");
+     logger.info(`Waiting ${waitSeconds} seconds because we were rate limited ...`);
+     await sleep(waitSeconds * 1000);
+   }
+ }
+});
+
+function sleep(ms = 120000) {
+ return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 test("appointment", async ({ context, params }, testInfo) => {
   logger.debug(JSON.stringify(params, null, 2));
   const serviceURL = await getServiceURL(await context.newPage(), {
