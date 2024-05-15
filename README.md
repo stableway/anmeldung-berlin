@@ -38,7 +38,25 @@ docker run \
     anmeldung-berlin
 ```
 
-### 2b. Run Locally on Mac OS
+### 2b. Run with Docker Compose through a Proxy
+
+This setup uses `docker compose` and consists of two services:
+
+- **Application**: Processes the booking
+- **Tor Proxy**: Avoids rate limiting and blocks
+
+This allows the application to run in a loop until a successful booking is made without risking being blocked.
+
+To get started, follow these steps:
+
+```bash
+npx extract-stealth-evasions
+cp .env.example .env
+# Then edit .env with your preferred settings
+docker compose up --build
+```
+
+### 2c. Run Locally on Mac OS
 
 Run the program from the command line.
 
@@ -84,6 +102,9 @@ Environment Variable | Parameter Default | Description
  `APPOINTMENT_LATEST_DATE` | `"2069-12-31 GMT"` | Latest date for appointment.
  `APPOINTMENT_EARLIEST_TIME` | `"00:00 GMT"` | Earliest time for appointment.
  `APPOINTMENT_LATEST_TIME` | `"23:59 GMT"` | Latest time for appointment.
+| `DELAY_EACH_RETRY_IN_SEC` | `"60"` | Delay between retries in seconds.
+| `RETRIES` | `"10"` | Number of retries before giving up.
+| `TIMEOUT_IN_SEC` | `"60"` | Timeout for page load in seconds.
 
 ## Environment Variables
 

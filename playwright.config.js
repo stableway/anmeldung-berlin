@@ -3,7 +3,8 @@ const { defineConfig, devices } = require("@playwright/test");
 module.exports = defineConfig({
   name: "anmeldung-berlin",
   testDir: "./tests/",
-  timeout: 0,
+  retries: process.env.RETRIES ? parseInt(process.env.RETRIES, 10) : 0,
+  timeout: (process.env.TIMEOUT_IN_SEC ? parseInt(process.env.TIMEOUT_IN_SEC, 10) : 0) * 1000,
   reporter: [["html", { open: "never" }]],
   use: {
     ...devices["Desktop Chrome"],

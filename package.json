@@ -9,7 +9,7 @@
   "author": "Daniel Cortez Stevenson",
   "license": "MIT",
   "dependencies": {
-    "@playwright/test": "^1.40.1",
+    "@playwright/test": "^1.44.0",
     "bluebird": "^3.7.2",
     "mailslurp-client": "^15.17.4",
     "winston": "^3.8.2"
