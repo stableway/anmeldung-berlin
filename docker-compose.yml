@@ -1,0 +1,27 @@
+services:
+  registration-bot:
+    platform: linux/amd64
+    depends_on:
+      tor-proxy:
+        condition: service_healthy
+        restart: true
+    restart: on-failure
+    build: .
+    volumes:
+      - ./playwright-report:/home/pwuser/playwright-report
+      - ./test-results:/home/pwuser/test-results
+    env_file: .env
+    environment:
+      CONCURRENCY: 1
+      DELAY_EACH_RETRY_IN_SEC: 15
+      PROXY_URL: socks5://tor-proxy:9050
+      RETRIES: 20
+      TIMEOUT_IN_SEC: 120
+
+  tor-proxy:
+    image: osminogin/tor-simple
+    restart: always
+    ports: [9050:9050]
+    volumes:
+      - ./torrc.conf:/etc/tor/torrc:ro
+      - ./tor-data:/var/lib/tor:rw

@@ -17,6 +17,26 @@ const test = require("../src/test.js")({
   APPOINTMENT_LATEST_TIME: "23:59 GMT",
 });
 
+// Pauses the test for a given amount of time before each retry.
+// This is useful to avoid rate limiting or captcha issues.
+// eslint-disable-next-line no-empty-pattern
+test.beforeEach(async ({}, testInfo) => {
+  if (!testInfo.retry) {
+    return;
+  }
+
+  const delayEachRetry = parseInt(process.env.DELAY_EACH_RETRY_IN_SEC || "0");
+  if (!delayEachRetry) {
+    return;
+  }
+
+  await sleep(delayEachRetry * 1000);
+});
+
+async function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 test("appointment", async ({ context, params }, testInfo) => {
   logger.debug(JSON.stringify(params, null, 2));
   const serviceURL = await getServiceURL(await context.newPage(), {
@@ -53,6 +73,7 @@ test("appointment", async ({ context, params }, testInfo) => {
         },
         testInfo
       );
+      testInfo.skip();
       return;
     } catch (e) {
       logger.error(
